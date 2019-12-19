@@ -18,7 +18,8 @@ end
 local length = tArgs[1] and tonumber(tArgs[1]) or 1
 local waitTime = tArgs[2] and tonumber(tArgs[2]) or 5
 
-local position = {x=0, y=0, z=0, w="z"}
+local position = vector.new(0, 0, 0)
+local rotation = 0
 local furnaceTime = os.clock()
 
 local _fuel = {}
@@ -47,13 +48,8 @@ local function notEnoughFuel()
 end
 
 local function workbenchError(missing)
-    printError("Item "..missing.." is missing. Please add some or set the area and press any key...")
-    while true do
-        local sEvent = os.pullEvent()
-        if sEvent == "key" or sEvent == "turtle_inventory" then
-            break
-        end
-    end
+    printError("Item "..missing.." is missing. Please add some...")
+    os.pullEvent( "turtle_inventory" )
 end
 
 local function inventoryFull()
@@ -68,20 +64,22 @@ local function filteredDetect(name, dir)
 end
 
 local function place(items, dir)
-    local turtlePlace = dir and turtle["place"..dir] or turtle.place
-    local index = turtle.getSelectedSlot()
-    for i, v in ipairs(items) do
-        if v.count > 0 then
-            turtle.select(v.index)
-            if turtlePlace() then
-                v.count = v.count - 1
-                items.count = items.count - 1
-                turtle.select(index)
-                return true
+    if items then
+        local turtlePlace = dir and turtle["place"..dir] or turtle.place
+        local index = turtle.getSelectedSlot()
+        for i, v in ipairs(items) do
+            if v.count > 0 then
+                turtle.select(v.index)
+                if turtlePlace() then
+                    v.count = v.count - 1
+                    items.count = items.count - 1
+                    turtle.select(index)
+                    return true
+                end
             end
         end
+        turtle.select(index)
     end
-    turtle.select(index)
     return false
 end
 
@@ -120,10 +118,12 @@ end
 local function stackItems()
     local index = turtle.getSelectedSlot()
     for i=1, 15 do
-        for j=i+1, 16 do
-            if turtle.getItemCount(j) > 0 then
-                turtle.select(j)
-                turtle.transferTo(i)
+        if turtle.getItemSpace(i) > 0 then
+            for j=i+1, 16 do
+                if turtle.getItemCount(j) > 0 then
+                    turtle.select(j)
+                    turtle.transferTo(i)
+                end
             end
         end
     end
@@ -289,45 +289,23 @@ local function refuel(moves)
     return false
 end
 
-local function turnLeft()
-    local w = position.w
-
-    if w == "-z" then
-        w = "x"
-    elseif w == "x" then
-        w = "z"
-    elseif w == "z" then
-        w = "-x"
-    elseif w == "-x" then
-        w = "-z"
-    else
-        print("Invalid rotation")
+local function turnBack()
+    if math.random(0, 1) == 0 then
+        return turnLeft() and turnLeft()
     end
 
-    if w ~= position.w then
-        turtle.turnLeft()
-        position.w = w
+    return turnRight() and turnRight()
+end
+
+local function turnLeft()
+    if turtle.turnLeft() then
+        rotation = (rotation + 270) % 360
     end
 end
 
 local function turnRight()
-    local w = position.w
-
-    if w == "-z" then
-        w = "-x"
-    elseif w == "-x" then
-        w = "z"
-    elseif w == "z" then
-        w = "x"
-    elseif w == "x" then
-        w = "-z"
-    else
-        print("Invalid rotation")
-    end
-
-    if w ~= position.w then
-        turtle.turnRight()
-        position.w = w
+    if turtle.turnRight() then
+        rotation = (rotation + 90) % 360
     end
 end
 
@@ -359,11 +337,9 @@ local function back()
     end
 
     if not turtle.back() then
-        turnLeft()
-        turnLeft()
+        turnBack()
         forward()
-        turnLeft()
-        turnLeft()
+        turnBack()
     else
         local index = position.w:gsub("-", "")
         local sign = string.find(position.w, "-") and 1 or -1
@@ -418,12 +394,12 @@ local function chestSetup(dir)
     turtle.select(1)
     while turtleSuck() do end
 
-    local filter = {"log, sapling"}
+    local filter = {"log", "sapling"}
     for k, v in pairs(_fuel) do
-        filter[#filter+1] = k
+        filter[#filter+1] = {key=k, filter=function(data) return data and data.name == k end}
     end
 
-    local items, others, empty = getItems(unpack(filter))
+    local items, others = getItems(unpack(filter))
 
     for i=1, #others do
         turtle.select(others[i])
@@ -480,67 +456,84 @@ local function furnaceSetup(hopper)
 
     turtle.suck()
 
-    local items = getItems("coal", "log", "sapling")
+    local filter = {"log", "sapling"}
+    for k, v in pairs(_fuel) do
+        filter[#filter+1] = {key=k, filter=function(data) return data and data.name == k end}
+    end
+
+    local items = getItems(unpack(filter))
 
     if not items.log then
         return false
     end
 
-    local mostCoal = getMostAbundant(items.coal)
     local mostLog = getMostAbundant(items.log)
-    local mostSapling = getMostAbundant(items.sapling)
-
     local logs = math.min(64, mostLog.count)
 
-    if mostCoal and logs >= 8 and mostCoal.count * 8 >= logs then
-        local c = math.floor(logs/8)
-        drop(mostCoal, c)
-        furnaceTime = c * 80        
-        logs = c * 8
-    elseif mostSapling and (mostSapling.count - length*length) * 0.5 >= logs then
-        logs = math.min(32, logs)
-        drop(mostSapling, logs*2)
-        furnaceTime = logs * 2 * 5
-    else
-        if logs < 3 then
-            return false
+    local fuelFound = false
+    for k, v in pairs(items) do
+        if _fuel[k] and _fuel[k].power <= 640 then
+            local most = getMostAbundant(v)
+            local operations = _fuel[k].power/10
+            if most and logs >= operations and most.count * operations >= logs then
+                local c = math.floor(logs/operations)
+                drop(most, c)
+                furnaceTime = c * _fuel[k].power
+                logs = c * operations
+                fuelFound = true
+                break
+            end
         end
+    end
 
-        local total = 0
-        for k, v in pairs(items.log) do
-            total = total + v.count
-        end
+    if not fuelFound then
+        local mostSapling = getMostAbundant(items.sapling)
 
-        local same = logs == total
+        if mostSapling and (mostSapling.count - length*length) * 0.5 >= logs then
+            logs = math.min(32, logs)
+            drop(mostSapling, logs*2)
+            furnaceTime = logs * 2 * 5
+        else
+            if logs < 3 then
+                return false
+            end
 
-        local r = logs % 3
-        logs = logs-r
-
-        local other = nil
-        if not same then
+            local total = 0
             for k, v in pairs(items.log) do
-                if v ~= mostLog then
-                    if v.count >= logs / 1.5 then
-                        other = v
-                        break
+                total = total + v.count
+            end
+
+            local same = logs == total
+
+            local r = logs % 3
+            logs = logs-r
+
+            local other = nil
+            if not same then
+                for k, v in pairs(items.log) do
+                    if v ~= mostLog then
+                        if v.count >= logs / 1.5 then
+                            other = v
+                            break
+                        end
                     end
                 end
             end
-        end
-        if not other then
-            if logs < 5 then
-                return false
+            if not other then
+                if logs < 5 then
+                    return false
+                end
+                while r < logs / 1.5 do
+                    logs = logs - 3
+                    r = r + 3
+                end
+            else
+                mostLog = other
             end
-            while r < logs / 1.5 do
-                logs = logs - 3
-                r = r + 3
-            end
-        else
-            mostLog = other
+            r = logs / 1.5
+            drop(mostLog, r)
+            furnaceTime = r * 15
         end
-        r = logs / 1.5
-        drop(mostLog, r)
-        furnaceTime = r * 15
     end
 
     up()
@@ -573,12 +566,16 @@ local function hopperSetup(items)
             if not most or not place(most) then
                 workbenchError("chest")
                 items.chest = getItems("chest")
+                most = getMostAbundant(items.chest)
             end
         end
-        chestSetup()
-        up()
         if most and most.count > 0 then
+            up()
             place(most, "Down")
+            chestSetup("Down")
+        else
+            chestSetup()
+            up()
         end
     else
         chestSetup("Down")
@@ -586,8 +583,7 @@ local function hopperSetup(items)
 end
 
 local function workbenchSetup()
-    turnLeft()
-    turnLeft()
+    turnBack()
 
     stackItems()
 
@@ -622,8 +618,7 @@ local function workbenchSetup()
         inventoryFull()
     end
 
-    turnLeft()
-    turnLeft()
+    turnBack()
 end
 
 local function rawPlant(sapling)
@@ -642,8 +637,7 @@ local function plantRight(sapling)
     for i=1, length-1 do
         turnLeft()
         rawPlant(sapling)
-        turnRight()
-        turnRight()
+        turnBack()
         rawPlant(sapling)
         turnLeft()
         back()
