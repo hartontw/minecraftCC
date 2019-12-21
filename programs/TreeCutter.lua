@@ -1,25 +1,33 @@
 local tArgs = { ... }
 
+local function printn(str)
+    print(str.."\n")
+end
+
 if not turtle then
-    print("Requires a turtle")
+    printn("Requires a turtle")
     return
 end
 
 if false then
-    print("Turtle requires a valid tool")
+    printn("Turtle requires a valid tool")
     return
 end
 
-if tArgs[1] and not tonumber(tArgs[1]) or tArgs[2] and not tonumber(tArgs[2]) then
-    print("Usage: length(number) waitTime(number)")
+if tArgs[1] and not tonumber(tArgs[1]) or tArgs[2] and not tonumber(tArgs[2]) or tArgs[3] and not tonumber(tArgs[3]) then
+    printn("Usage: length(number) waitTime(number) space(number)")
     return
 end
 
 local length = tArgs[1] and tonumber(tArgs[1]) or 1
-local waitTime = tArgs[2] and tonumber(tArgs[2]) or 5
+local waitTime = tArgs[2] and tonumber(tArgs[2]) or 15
+local space = tArgs[3] and tonumber(tArgs[3]) or 0
 
 local position = vector.new(0, 0, 0)
 local rotation = 0
+
+local plantingInfo = { works = 0, last = 0, waited = 0 }
+local cutingInfo = { works = 0, time = 0, moves = 0 }
 local furnaceTime = os.clock()
 
 local _fuel = {}
@@ -28,32 +36,67 @@ _fuel["minecraft:coal_block"] = {power=800, stack=64}
 _fuel["minecraft:blaze_rod"] = {power=120, stack=64}
 _fuel["minecraft:coal"] = {power=80, stack=64}
 
+local _sapling = {}
+_sapling[0] = {name="Oak", lengths={1}, space=0}
+_sapling[1] = {name="Spruce", lengths={1, 2}, space=0}
+_sapling[2] = {name="Birch", lengths={1}, space=0}
+_sapling[3] = {name="Jungle", lengths={1, 2}, space=1}
+_sapling[4] = {name="Acacia", lengths={1}, space=0}
+_sapling[5] = {name="Dark Oak", lengths={2}, space=0}
+
+local function round(n)
+    return math.floor(n+0.5)
+end
+
+local function checkPlantSetup(data)
+    local info = nil
+    if data and data[1].name == "minecraft:sapling" then
+        info = _sapling[data[1].damage]
+        if info then
+            local ok = false
+            for i, v in ipairs(info.lengths) do
+                if v == length then
+                    ok = true
+                    break
+                end
+            end
+            if not ok then
+                printn(tostring(length).."x"..tostring(length).." is not an appropiate setup for "..info.name.." tree.")
+            end
+            if info.space > space then
+                printn(info.name.." sapling needs at least "..tostring(info.space).." empty blocks around.")
+            end
+        end
+    end
+    return info
+end
+
 local function printPosition()
-    print("X: "..tostring(position.x)..", Y: "..tostring(position.y)..", Z: "..tostring(position.z))
+    printn("X: "..tostring(position.x)..", Y: "..tostring(position.y)..", Z: "..tostring(position.z))
 end
 
 local function workAreaBlocked(dir)
-    printError(dir .. " block is inaccessible. Please release the area and press any key...")
+    printError(dir .. " block is inaccessible. Please release the area and press any key...\n")
     os.pullEvent( "key" )
 end
 
 local function notEnoughSaplings(amount)
-    printError("Not enough saplings in turtle inventory. Add "..amount.." saplings or more...")
+    printError("Not enough saplings in turtle inventory. Add "..amount.." saplings or more...\n")
     os.pullEvent( "turtle_inventory" )
 end
 
 local function notEnoughFuel()
-    printError("Not enough fuel. Insert some fuel...")
+    printError("Not enough fuel. Insert some fuel...\n")
     os.pullEvent( "turtle_inventory" )
 end
 
 local function workbenchError(missing)
-    printError("Item "..missing.." is missing. Please add some...")
+    printError("Item "..missing.." is missing. Please add some...\n")
     os.pullEvent( "turtle_inventory" )
 end
 
 local function inventoryFull()
-    printError("Inventory is full. Please release some slot...")
+    printError("Inventory is full. Please release some slot...\n")
     os.pullEvent( "turtle_inventory" )
 end
 
@@ -289,6 +332,22 @@ local function refuel(moves)
     return false
 end
 
+local function turnLeft()
+    if turtle.turnLeft() then
+        rotation = (rotation + 270) % 360
+        return true
+    end
+    return false
+end
+
+local function turnRight()
+    if turtle.turnRight() then
+        rotation = (rotation + 90) % 360
+        return true
+    end
+    return false
+end
+
 local function turnBack()
     if math.random(0, 1) == 0 then
         return turnLeft() and turnLeft()
@@ -297,16 +356,29 @@ local function turnBack()
     return turnRight() and turnRight()
 end
 
-local function turnLeft()
-    if turtle.turnLeft() then
-        rotation = (rotation + 270) % 360
+local function rawDig(dir)
+    dir = dir or ""
+    if turtle["detect"..dir]() then
+        if not turtle["dig"..dir]() then
+            workAreaBlocked(string.len(dir) > 0 and dir or "Forward")
+        end
+    else
+        if not turtle["attack"..dir]() then
+            sleep( 0.5 )
+        end
     end
 end
 
-local function turnRight()
-    if turtle.turnRight() then
-        rotation = (rotation + 90) % 360
-    end
+local function dig()
+    rawDig()
+end
+
+local function digDown()
+    rawDig("Down")
+end
+
+local function digUp()
+    rawDig("Up")
 end
 
 local function forward()
@@ -315,20 +387,21 @@ local function forward()
     end
 
     while not turtle.forward() do
-        if turtle.detect() then
-            if not turtle.dig() then
-                workAreaBlocked("Forward")
-            end
-        else
-            if not turtle.attack() then
-                sleep( 0.5 )
-            end
-        end
+        dig()
     end
 
-    local index = position.w:gsub("-", "")
-    local sign = string.find(position.w, "-") and -1 or 1
-    position[index] = position[index] + sign
+    if rotation == 0 then
+        position.z = position.z + 1
+    elseif rotation == 90 then
+        position.x = position.x + 1
+    elseif rotation == 180 then
+        position.z = position.z - 1
+    elseif rotation == 270 then
+        position.x = position.x - 1
+    else
+        printError("Rotation error!\n")
+        os.pullEvent("key")
+    end
 end
 
 local function back()
@@ -341,9 +414,18 @@ local function back()
         forward()
         turnBack()
     else
-        local index = position.w:gsub("-", "")
-        local sign = string.find(position.w, "-") and 1 or -1
-        position[index] = position[index] + sign
+        if rotation == 0 then
+            position.z = position.z - 1
+        elseif rotation == 90 then
+            position.x = position.x - 1
+        elseif rotation == 180 then
+            position.z = position.z + 1
+        elseif rotation == 270 then
+            position.x = position.x + 1
+        else
+            printError("Rotation error!\n")
+            os.pullEvent("key")
+        end
     end
 end
 
@@ -353,15 +435,7 @@ local function up()
     end
 
     while not turtle.up() do
-        if turtle.detectUp() then
-            if not turtle.digUp() then
-                workAreaBlocked("Top")
-            end
-        else
-            if not turtle.attackUp() then
-                sleep( 0.5 )
-            end
-        end
+        digUp()
     end
 
     position.y = position.y + 1
@@ -373,18 +447,10 @@ local function down()
     end
 
     while not turtle.down() do
-        if turtle.detectDown() then
-            if not turtle.digDown() then
-                workAreaBlocked("Bottom")
-            end
-        else
-            if not turtle.attackDown() then
-                sleep( 0.5 )
-            end
-        end
+        digDown()
     end
 
-    position.y = position.y + 1
+    position.y = position.y - 1
 end
 
 local function chestSetup(dir)
@@ -433,7 +499,7 @@ local function chestSetup(dir)
     end
 
     if items.sapling then
-        save(items.sapling, 64)
+        save(items.sapling, math.max(64, length*length))
     end
 
 end
@@ -442,7 +508,7 @@ local function furnaceSetup(hopper)
     
     furnaceTime = furnaceTime - os.clock()
     if furnaceTime > 0 then
-        print("Waiting "..tostring(math.floor(furnaceTime)).. " seconds for furnace to finish...")
+        printn("Waiting "..tostring(round(furnaceTime)).. " seconds for furnace to finish...")
         sleep(furnaceTime)
     end
 
@@ -622,41 +688,51 @@ local function workbenchSetup()
 end
 
 local function rawPlant(sapling)
-    while not place(sapling) do
-        if turtle.detect() then
-            if not turtle.dig() then
-                workAreaBlocked("Forward")
+    local detect, data = turtle.inspect()
+    if not detect or data.name ~= sapling[1].name or data.metadata ~= sapling[1].damage then
+        while not place(sapling) do
+            if detect then
+                if not turtle.dig() then
+                    workAreaBlocked("Forward")
+                end
+            elseif not turtle.attack() then
+                sleep( 0.5 )
             end
-        elseif not turtle.attack() then
-            sleep( 0.5 )
         end
     end
 end
 
-local function plantRight(sapling)
-    for i=1, length-1 do
-        turnLeft()
-        rawPlant(sapling)
-        turnBack()
-        rawPlant(sapling)
-        turnLeft()
+local function linePlant(sapling, blocks, sideA, sideB, turnA, turnB)
+    for i=1, blocks do
+        if sideB then
+            turnA()
+            rawPlant(sapling)
+            turnB()
+        end
+        if sideA then
+            turnB()
+            rawPlant(sapling)
+            turnA()
+        end
         back()
         rawPlant(sapling)
     end
 end
 
-local function plantLeft(sapling, top, bottom)
-    for i=1, length-1 do
-        if top then
-            turnLeft()
-            rawPlant(sapling)
-            turnRight()
-            if bottom then
-                turnRight()
-                rawPlant(sapling)
-                turnLeft()
-            end
-        end
+local function plantRight(sapling, blocks, top, bottom)
+    linePlant(sapling, blocks, top, bottom, turnLeft, turnRight)
+end
+
+local function plantLeft(sapling, blocks, top, bottom)
+    linePlant(sapling, blocks, top, bottom, turnRight, turnLeft)
+end
+
+local function climbRow(sapling, top, turn)
+    turn()
+    rawPlant(sapling)
+    back()
+    rawPlant(sapling)
+    if top then
         back()
         rawPlant(sapling)
     end
@@ -665,72 +741,177 @@ end
 local function plant()
     stackItems()
 
-    local index = turtle.getSelectedSlot()
     local sapling = getMostAbundant(getItems("sapling"))
     local blocks = length*length
 
     if sapling and sapling.count >= blocks then
+        
+        local info = checkPlantSetup(sapling)
+        local name = info and info.name or sapling.fullName
+        printn("Planting "..tostring(blocks).." "..name.." saplings...")
+
         if length == 1 then
-            turtle.select(sapling[1].index)
-            turtle.place()
-            turtle.select(index)
+            rawPlant(sapling)
+            plantingInfo.last = os.clock()
+            plantingInfo.works = plantingInfo.works + 1
+            printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
+            return
+        end
+
+        forward()
+        forward()
+            
+        if length == 2 then
+            turnRight()
+            rawPlant(sapling)
+            turnLeft()
+            back()
+            rawPlant(sapling)
+            turnRight()
+            rawPlant(sapling)
+            turnLeft()
+            back()
+            rawPlant(sapling)
+        elseif length == 3 then
+            turnRight()
+            forward()
+            forward()
+            plantLeft(sapling, length-1, true, true)
+            turnLeft()
+            rawPlant(sapling)
+            back()
+            rawPlant(sapling)
+            back()
+            rawPlant(sapling)
         else
-            for i=1, length-1 do
-                forward()
+            turnLeft()
+            back()
+
+            local rows = length
+            local top, bottom
+            while rows > 0 do
+                if rows < length then
+                    climbRow(sapling, top, turnRight)
+                    back()
+                    turnRight()
+                end
+
+                top = rows%3 == 0 and (rows/3)%2 == 0
+                plantRight(sapling, length-2, top, true)
+                rows = top and rows - 3 or rows - 2
+                climbRow(sapling, top, turnLeft)
+
+                top = rows%3 == 0 and (rows/3)%2 == 1
+                bottom = rows > 1
+                if bottom then
+                    back()
+                end
+                turnLeft()
+                plantLeft(sapling, length-2, top, bottom)
+                rows = top and rows - 3 or rows - 2
+            end
+            plantLeft(sapling, 1, top, bottom)
+
+            turnLeft()
+            if top then
+                rawPlant(sapling)
+                rows = length - 1
+            else
+                rows = length
             end
 
-            local remain = length
-            while remain > 0 do
-                if position.x == 0 then
-                    if remain > 3 then
-                        turnLeft()
-                        plantRight(sapling)
-                        remain = remain - 3
-                        turnRight()
-                        rawPlant(sapling)
-                        back()
-                        rawPlant(sapling)
-                        back()
-                        rawPlant(sapling)
-                        if remain > 1 then
-                            back()
-                        end
-                        turnRight()
-                    else
-                        turnRight()
-                        for i=1, length-1 do
-                            forward()
-                        end
-                    end
-                else
-                    plantLeft(sapling, remain > 1, remain > 2)
-                    turnLeft()
-                    if remain > 1 then
-                        rawPlant(sapling)
-                        back()
-                        rawPlant(sapling)
-                        if remain > 2 then
-                            back()
-                            rawPlant(sapling)
-                            if remain > 4 then
-                                back()
-                            end
-                        end
-                    else
-                        back()
-                        rawPlant(sapling)
-                    end
-                    remain = remain - 3
-                end
+            for i=1, rows do
+                back()
+                rawPlant(sapling)
             end
         end
+
+        plantingInfo.last = os.clock()
+        plantingInfo.works = plantingInfo.works + 1
+        printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
     else
         notEnoughSaplings(blocks)
     end
 end
 
+local function lineCut(blocks, sideA, sideB, turnA, turnB)
+    for i=1, blocks do
+        forward()
+        if sideB then
+            turnA()
+            dig()
+            turnB()
+        end
+        if sideA then
+            turnB()
+            dig()
+            turnA()
+        end
+    end
+end
+
+local function cutRight(blocks, top, bottom)
+    lineCut(blocks, top, bottom, turnLeft, turnRight)
+end
+
+local function cutLeft(blocks, top, bottom)
+    lineCut(blocks, top, bottom, turnRight, turnLeft)
+end
+
+local function cutBranch(moves)
+    if filteredDetect(":log") or filteredDetect(":leaves") or filteredDetect(":vine") then
+        
+    end
+    return moves
+end
+
+local function cutPerimeter(moves)
+    for j=1, 4 do
+        for i=1, length do
+            if i > 1 then
+                turnLeft()
+                moves = cutBranch(moves)
+                turnRight()
+            end
+            if i < length then
+                forward()
+                moves = moves + 1
+            end
+        end
+        moves = cutBranch(moves)
+        turnRight()
+    end
+    return moves
+end
+
 local function cut()
-    
+    if plantingInfo.works > 0 then
+        local waited = os.clock() - plantingInfo.last
+        plantingInfo.waited = plantingInfo.waited + waited
+        printn("Waited "..tostring(round(waited)).." seconds. Average waiting time: "..os.date("!%X", plantingInfo.waited / plantingInfo.works))
+    end
+
+    printn("Cut work in progress..")
+    local cutStart = os.clock()
+
+    forward()
+    local moves = cutPerimeter(1)
+    while filteredDetect("log", "Up") or filteredDetect("leaves", "Up") do
+        up()
+        moves = cutPerimeter(moves)
+    end
+
+    while position.y > 0 do
+        down()
+        moves = moves + 1
+    end
+
+    cutingInfo.works = cutingInfo.works + 1
+    cutingInfo.moves = cutingInfo.moves + moves
+    cutingInfo.time = os.clock() - cutStart
+    print("Cut work finished:")
+    print("· "..tostring(moves).." moves. Average moves: "..tostring(round(cutingInfo.moves / cutingInfo.works)))
+    printn("· "..tostring(round(cutingInfo.time)).." seconds. Average working time: "..os.date("!%X", cutingInfo.time / cutingInfo.works))
 end
 
 local function main()
@@ -738,14 +919,21 @@ local function main()
     length = math.max(length, 1)
     waitTime = math.max(waitTime, 1)
 
-    print("length("..tostring(length)..") waitTime("..tostring(waitTime)..")")
+    term.clear()
+    term.setCursorPos(1, 1)
+    printn(shell.getRunningProgram()..": length("..tostring(length)..") waitTime("..tostring(waitTime)..") space("..tostring(space)..")")
 
     while true do
-        if filteredDetect(":log") then
+        for i=1, space do forward() end
+        if filteredDetect(":log") or filteredDetect(":leaves") or filteredDetect(":vine") then
             cut()
+            for i=1, space do back() end
             workbenchSetup()
         elseif not filteredDetect(":sapling") then
             plant()
+            for i=1, space do back() end
+        else
+            for i=1, space do back() end
         end
         sleep(waitTime)
     end
