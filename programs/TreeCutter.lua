@@ -835,33 +835,31 @@ local function plant()
 end
 
 local function lineCut(blocks, sideA, sideB, turnA, turnB)
-    for i=1, blocks do
-        forward()
+    for i=1, blocks do        
         if sideB then
-            turnA()
-            dig()
             turnB()
+            dig()
+            turnA()
         end
         if sideA then
-            turnB()
-            dig()
             turnA()
+            dig()
+            turnB()
+        end
+        if i < blocks then
+            forward()
         end
     end
-end
-
-local function cutRight(blocks, top, bottom)
-    lineCut(blocks, top, bottom, turnLeft, turnRight)
-end
-
-local function cutLeft(blocks, top, bottom)
-    lineCut(blocks, top, bottom, turnRight, turnLeft)
 end
 
 local function cutBranch(moves)
+    local startRotation = rotation
+    local startPosition = vector.new(position.x, position.y, position.z)
+
     if filteredDetect(":log") or filteredDetect(":leaves") or filteredDetect(":vine") then
         
     end
+
     return moves
 end
 
@@ -884,7 +882,46 @@ local function cutPerimeter(moves)
     return moves
 end
 
+local function cutInside(moves, far)
+    local sides = 0
+    local cols = length - 2
+    local rows = length - 2
+
+    while rows > 0 do
+        local top = rows > 2
+        local bottom = rows > 1 and (far and position.z > 2 or not far and position.z < length-1)
+        local right = far and sides % 2 == 0
+        local turnA = right and turnLeft or turnRight
+        local turnB = right and turnRight or turnLeft
+
+        lineCut(cols, top, bottom, turnA, turnB)
+        moves = moves + cols - 1
+        rows = rows - 1
+        if top then rows = rows - 1 end
+        if bottom then rows = rows - 1 end
+        turnA()
+        if rows > 0 then
+            if top then
+                forward()
+                moves = moves + 1
+            end
+            forward()
+            moves = moves + 1
+            if rows > 2 then
+                forward()
+                moves = moves + 1
+            end
+        end
+        turnA()
+        sides = sides + 1
+    end
+
+    return moves
+end
+
 local function cut()
+    turtle.select(1)
+
     if plantingInfo.works > 0 then
         local waited = os.clock() - plantingInfo.last
         plantingInfo.waited = plantingInfo.waited + waited
@@ -901,9 +938,88 @@ local function cut()
         moves = cutPerimeter(moves)
     end
 
-    while position.y > 0 do
-        down()
-        moves = moves + 1
+    if length < 3 then
+        up()
+        moves = cutPerimeter(moves)
+    elseif length == 3 then
+        forward()
+        turnRight()
+        forward()
+        moves = moves + 2 + position.y
+        while position.y > 0 do down() end
+        back()
+        turnLeft()
+        back()
+        back()
+    elseif length == 4 then
+        forward()
+        turnRight()
+        forward()
+        moves = moves + 2
+        local turnA = turnLeft
+        local turnB = turnRight
+        local height = position.y
+        while true do
+            turnA()
+            dig()
+            turnB()
+            forward()
+            moves = moves + 1
+            turnA()
+            dig()
+            turnA()
+            if position.y > 0 then
+                down()
+                moves = moves + 1
+            else
+                break
+            end
+            turnA = turnA == turnLeft and turnRight or turnLeft
+            turnB = turnB == turnRight and turnLeft or turnRight
+        end
+        if height % 2 == 0 then
+            forward()
+            forward()
+            turnRight()
+            back()
+            back()
+            moves = moves + 4
+        else
+            back()
+            turnLeft()
+            back()
+            back()
+            moves = moves + 3
+        end
+    elseif length > 4 then
+        forward()
+        forward()
+        turnRight()
+        forward()
+        local height = position.y
+        while position.y > 0 do
+            moves = cutInside(moves, (height-position.y) % 2 == 0)
+            down()
+            moves = moves + 1
+        end
+        moves = cutInside(moves, (height-position.y) % 2 == 0)
+        while position.x > 0 do
+            if rotation == 90 then
+                back()
+            else
+                forward()
+            end
+            moves = moves + 1
+        end
+        if rotation == 90 then
+            turnLeft()
+        else
+            turnRight()
+        end
+        while position.z > 0 do
+            back()
+            moves = moves + 1
+        end
     end
 
     cutingInfo.works = cutingInfo.works + 1
@@ -921,14 +1037,16 @@ local function main()
 
     term.clear()
     term.setCursorPos(1, 1)
-    printn(shell.getRunningProgram()..": length("..tostring(length)..") waitTime("..tostring(waitTime)..") space("..tostring(space)..")")
+    printn(shell.getRunningProgram()..": length("..tostring(length)..") waitTime("..tostring(waitTime)..") space("..tostring(space)..")")    
 
+    workbenchSetup()
     while true do
         for i=1, space do forward() end
         if filteredDetect(":log") or filteredDetect(":leaves") or filteredDetect(":vine") then
             cut()
             for i=1, space do back() end
             workbenchSetup()
+            plant()
         elseif not filteredDetect(":sapling") then
             plant()
             for i=1, space do back() end
