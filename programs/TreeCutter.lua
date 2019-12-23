@@ -106,6 +106,12 @@ local function filteredDetect(name, dir)
     return detect and string.find(data.name, name)
 end
 
+local function detectTreePart(dir)
+    local turtleInspect = dir and turtle["inspect"..dir] or turtle.inspect
+    local detect, data = turtleInspect()
+    return detect and (string.find(data.name, ":log") or string.find(data.name, ":leaves") or string.find(data.name, ":vine"))
+end
+
 local function place(items, dir)
     if items then
         local turtlePlace = dir and turtle["place"..dir] or turtle.place
@@ -334,7 +340,7 @@ end
 
 local function turnLeft()
     if turtle.turnLeft() then
-        rotation = (rotation + 270) % 360
+        rotation = (rotation - 90) % 360
         return true
     end
     return false
@@ -835,7 +841,7 @@ local function plant()
 end
 
 local function lineCut(blocks, sideA, sideB, turnA, turnB)
-    for i=1, blocks do        
+    for i=1, blocks do
         if sideB then
             turnB()
             dig()
@@ -852,12 +858,56 @@ local function lineCut(blocks, sideA, sideB, turnA, turnB)
     end
 end
 
-local function cutBranch(moves)
-    local startRotation = rotation
-    local startPosition = vector.new(position.x, position.y, position.z)
+local function cutBranch(moves, extra)
 
-    if filteredDetect(":log") or filteredDetect(":leaves") or filteredDetect(":vine") then
-        
+    turnLeft()
+    if detectTreePart() then
+        if extra == 0 then
+            forward()
+            turnRight()
+            moves = cutBranch(moves+1, 0) + 1
+            turnLeft()
+            back()
+        else
+            dig()
+        end
+    end
+    turnRight()
+
+    turnRight()
+    if detectTreePart() then
+        if extra == 0 then
+            forward()
+            turnLeft()
+            moves = cutBranch(moves+1, 0) + 1
+            turnRight()
+            back()
+        else
+            dig()
+        end
+    end
+    turnLeft()
+
+    local lForward = detectTreePart()
+    if lForward then
+        forward()
+        moves = cutBranch(moves+1, extra) + 1
+        back()
+    else
+        local lUp = detectTreePart("Up")
+        if lUp then
+            up()
+            moves = cutBranch(moves+1, extra) + 1
+            down()
+        elseif extra > 0 then
+            forward()
+            moves = cutBranch(moves+1, extra-1)
+            up()
+            moves = cutBranch(moves+1, extra-1)
+            down()
+            back()
+            moves = moves + 2
+        end
     end
 
     return moves
@@ -868,7 +918,11 @@ local function cutPerimeter(moves)
         for i=1, length do
             if i > 1 then
                 turnLeft()
-                moves = cutBranch(moves)
+                if filteredDetect(":log") or filteredDetect(":leaves") then
+                    forward()
+                    moves = cutBranch(moves+1, 1) + 1
+                    back()
+                end
                 turnRight()
             end
             if i < length then
@@ -876,7 +930,11 @@ local function cutPerimeter(moves)
                 moves = moves + 1
             end
         end
-        moves = cutBranch(moves)
+        if filteredDetect(":log") or filteredDetect(":leaves") then
+            forward()
+            moves = cutBranch(moves+1, 1) + 1
+            back()
+        end
         turnRight()
     end
     return moves
@@ -935,12 +993,15 @@ local function cut()
     local moves = cutPerimeter(1)
     while filteredDetect("log", "Up") or filteredDetect("leaves", "Up") do
         up()
-        moves = cutPerimeter(moves)
+        moves = cutPerimeter(moves+1)
     end
 
     if length < 3 then
         up()
-        moves = cutPerimeter(moves)
+        moves = cutPerimeter(moves+1)
+        moves = moves + 1 + position.y
+        while position.y > 0 do down() end
+        back()
     elseif length == 3 then
         forward()
         turnRight()
@@ -1037,12 +1098,12 @@ local function main()
 
     term.clear()
     term.setCursorPos(1, 1)
-    printn(shell.getRunningProgram()..": length("..tostring(length)..") waitTime("..tostring(waitTime)..") space("..tostring(space)..")")    
+    printn(shell.getRunningProgram()..": length("..tostring(length)..") waitTime("..tostring(waitTime)..") space("..tostring(space)..")")
 
     workbenchSetup()
     while true do
         for i=1, space do forward() end
-        if filteredDetect(":log") or filteredDetect(":leaves") or filteredDetect(":vine") then
+        if detectTreePart() then
             cut()
             for i=1, space do back() end
             workbenchSetup()
