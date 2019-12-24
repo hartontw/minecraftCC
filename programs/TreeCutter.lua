@@ -757,111 +757,108 @@ local function plant()
 
     local sapling = getMostAbundant(getItems("sapling"))
     local blocks = length*length
-
-    if sapling and sapling.count >= blocks then
-        
-        local info = checkPlantSetup(sapling)
-        local name = info and info.name or sapling.fullName
-        printn("Planting "..tostring(blocks).." "..name.." saplings...")
-
-        if length == 1 then
-            rawPlant(sapling)
-            plantingInfo.last = os.clock()
-            plantingInfo.works = plantingInfo.works + 1
-            printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
-            return
+    
+    if not sapling or sapling.count < blocks then
+        workbenchSetup()
+        sapling = getMostAbundant(getItems("sapling"))
+        if not sapling or sapling.count < blocks then
+            notEnoughSaplings(blocks)
         end
-            
-        if length == 2 then
-            if not refuel(4) then
-                notEnoughFuel()
-            end
-            forward()
-            forward()
-            turnRight()
-            rawPlant(sapling)
-            turnLeft()
-            back()
-            rawPlant(sapling)
-            turnRight()
-            rawPlant(sapling)
-            turnLeft()
-            back()
-            rawPlant(sapling)
-        elseif length == 3 then
-            if not refuel(8) then
-                notEnoughFuel()
-            end
-            forward()
-            forward()
-            turnRight()
-            forward()
-            forward()
-            plantLeft(sapling, 2, true, true)
-            turnLeft()
-            rawPlant(sapling)
-            back()
-            rawPlant(sapling)
-            back()
-            rawPlant(sapling)
-        else
-            local groups = math.ceil(length/3)
-            local pases = groups + (groups%2 ~= 2 and 1 or 0)
-            local moves = pases * length + length - (length%2 ~= 0 and 1 or 0) + 2
-            if not refuel(moves) then
-                notEnoughFuel()
-            end
-
-            forward()
-            forward()
-            turnLeft()
-            back()
-
-            local rows = length
-            local top, bottom
-            while rows > 0 do
-                if rows < length then
-                    climbRow(sapling, top, turnRight)
-                    back()
-                    turnRight()
-                end
-
-                top = rows%3 == 0 and (rows/3)%2 == 0
-                plantRight(sapling, length-2, top, true)
-                rows = top and rows - 3 or rows - 2
-                climbRow(sapling, top, turnLeft)
-
-                top = rows%3 == 0 and (rows/3)%2 == 1
-                bottom = rows > 1
-                if bottom then
-                    back()
-                end
-                turnLeft()
-                plantLeft(sapling, length-2, top, bottom)
-                rows = top and rows - 3 or rows - 2
-            end
-            plantLeft(sapling, 1, top, bottom)
-
-            turnLeft()
-            if top then
-                rawPlant(sapling)
-                rows = length - 1
-            else
-                rows = length
-            end
-
-            for i=1, rows do
-                back()
-                rawPlant(sapling)
-            end
-        end
-
-        plantingInfo.last = os.clock()
-        plantingInfo.works = plantingInfo.works + 1
-        printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")        
-    else
-        notEnoughSaplings(blocks)
     end
+        
+    local info = checkPlantSetup(sapling)
+    local name = info and info.name or sapling.fullName
+    printn("Planting "..tostring(blocks).." "..name.." saplings...")
+
+    if length == 1 then
+        rawPlant(sapling)
+    elseif length == 2 then
+        if not refuel(4) then
+            notEnoughFuel()
+        end
+        forward()
+        forward()
+        turnRight()
+        rawPlant(sapling)
+        turnLeft()
+        back()
+        rawPlant(sapling)
+        turnRight()
+        rawPlant(sapling)
+        turnLeft()
+        back()
+        rawPlant(sapling)
+    elseif length == 3 then
+        if not refuel(8) then
+            notEnoughFuel()
+        end
+        forward()
+        forward()
+        turnRight()
+        forward()
+        forward()
+        plantLeft(sapling, 2, true, true)
+        turnLeft()
+        rawPlant(sapling)
+        back()
+        rawPlant(sapling)
+        back()
+        rawPlant(sapling)
+    else
+        local groups = math.ceil(length/3)
+        local pases = groups + (groups%2 ~= 2 and 1 or 0)
+        local moves = pases * length + length - (length%2 ~= 0 and 1 or 0) + 2
+        if not refuel(moves) then
+            notEnoughFuel()
+        end
+
+        forward()
+        forward()
+        turnLeft()
+        back()
+
+        local rows = length
+        local top, bottom
+        while rows > 0 do
+            if rows < length then
+                climbRow(sapling, top, turnRight)
+                back()
+                turnRight()
+            end
+
+            top = rows%3 == 0 and (rows/3)%2 == 0
+            plantRight(sapling, length-2, top, true)
+            rows = top and rows - 3 or rows - 2
+            climbRow(sapling, top, turnLeft)
+
+            top = rows%3 == 0 and (rows/3)%2 == 1
+            bottom = rows > 1
+            if bottom then
+                back()
+            end
+            turnLeft()
+            plantLeft(sapling, length-2, top, bottom)
+            rows = top and rows - 3 or rows - 2
+        end
+        plantLeft(sapling, 1, top, bottom)
+
+        turnLeft()
+        if top then
+            rawPlant(sapling)
+            rows = length - 1
+        else
+            rows = length
+        end
+
+        for i=1, rows do
+            back()
+            rawPlant(sapling)
+        end
+    end
+
+    plantingInfo.last = os.clock()
+    plantingInfo.works = plantingInfo.works + 1
+    printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
 end
 
 local function lineCut(blocks, sideA, sideB, turnA, turnB)
@@ -1109,7 +1106,6 @@ local function main()
     term.setCursorPos(1, 1)
     printn(shell.getRunningProgram()..": length("..tostring(length)..") waitTime("..tostring(waitTime)..") space("..tostring(space)..")")
 
-    workbenchSetup()
     while true do
         for i=1, space do forward() end
 
@@ -1120,17 +1116,15 @@ local function main()
         if detectTreePart() then
             cut()
             for i=1, space do back() end
-            workbenchSetup()
         elseif not filteredDetect(":sapling") then
             plant()
-            addBoneMeal()
             if detectTreePart() then
                 cut()
                 for i=1, space do back() end
-                workbenchSetup()
             else
                 for i=1, space do back() end
-                sleep(waitTime)                
+                workbenchSetup()
+                sleep(waitTime)
             end
         else
             for i=1, space do back() end
