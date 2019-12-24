@@ -37,12 +37,12 @@ _fuel["minecraft:blaze_rod"] = {power=120, stack=64}
 _fuel["minecraft:coal"] = {power=80, stack=64}
 
 local _sapling = {}
-_sapling[0] = {name="Oak", lengths={1}, space=0}
-_sapling[1] = {name="Spruce", lengths={1, 2}, space=0}
-_sapling[2] = {name="Birch", lengths={1}, space=0}
-_sapling[3] = {name="Jungle", lengths={1, 2}, space=1}
-_sapling[4] = {name="Acacia", lengths={1}, space=0}
-_sapling[5] = {name="Dark Oak", lengths={2}, space=0}
+_sapling[0] = {name="Oak", config={{length=1, space=0}}}
+_sapling[1] = {name="Spruce", config={{length=1, space=0}, {length=2, space=1}}}
+_sapling[2] = {name="Birch", config={{length=1, space=0}}}
+_sapling[3] = {name="Jungle", config={{length=1, space=0}, {length=2, space=1}}}
+_sapling[4] = {name="Acacia", config={{length=1, space=0}}}
+_sapling[5] = {name="Dark Oak", config={{length=2, space=0}}}
 
 local function round(n)
     return math.floor(n+0.5)
@@ -53,18 +53,18 @@ local function checkPlantSetup(data)
     if data and data[1].name == "minecraft:sapling" then
         info = _sapling[data[1].damage]
         if info then
-            local ok = false
-            for i, v in ipairs(info.lengths) do
-                if v == length then
-                    ok = true
+            local index = 0
+            for i, v in ipairs(info.config) do
+                if v.length == length then
+                    index = i
                     break
                 end
             end
-            if not ok then
+            if index == 0 then
                 printn(tostring(length).."x"..tostring(length).." is not an appropiate setup for "..info.name.." tree.")
             end
-            if info.space > space then
-                printn(info.name.." sapling needs at least "..tostring(info.space).." empty blocks around.")
+            if info.config[index].space > space then
+                printn(info.name.." sapling needs at least "..tostring(info.config[index].space).." empty blocks around.")
             end
         end
     end
@@ -230,7 +230,7 @@ local function getItems(...)
                 if args[1](data) then
                     local fn = data.fullName
                     if not items[fn] then
-                        items[fn] = { fullname = fn, count=0 }
+                        items[fn] = { fullname = fn, count = 0 }
                     end
                     items[fn][#items[fn] + 1] = data
                     items[fn].count = items[fn].count + data.count
@@ -336,6 +336,12 @@ local function refuel(moves)
 
     turtle.select(index)
     return false
+end
+
+local function addBoneMeal()
+    local boneFilter = function(data) return data and data.name == "minecraft:dye" and data.damage == 15 end
+    local boneMeal = getMostAbundant(getItems(boneFilter))
+    while not detectTreePart() and place(boneMeal) do end
 end
 
 local function turnLeft()
@@ -470,6 +476,7 @@ local function chestSetup(dir)
     for k, v in pairs(_fuel) do
         filter[#filter+1] = {key=k, filter=function(data) return data and data.name == k end}
     end
+    filter[#filter+1] = {key="boneMeal", filter=function(data) return data and data.name == "minecraft:dye" and data.damage == 15 end}
 
     local items, others = getItems(unpack(filter))
 
@@ -631,17 +638,18 @@ local function hopperSetup(items)
     end
     furnaceSetup(true)
     down()
-    if not filteredDetect("chest", "Down") then
+    if not filteredDetect("minecraft:chest", "Down") then
         down()
         local most = getMostAbundant(items.chest)
         while not filteredDetect("chest") do
+            dig()
             if not most or not place(most) then
                 workbenchError("chest")
                 items.chest = getItems("chest")
                 most = getMostAbundant(items.chest)
             end
         end
-        if most and most.count > 0 then
+        if most and most.count > 0 and most.fullName == "minecraft:chest_0" then
             up()
             place(most, "Down")
             chestSetup("Down")
@@ -763,11 +771,13 @@ local function plant()
             printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
             return
         end
-
-        forward()
-        forward()
             
         if length == 2 then
+            if not refuel(4) then
+                notEnoughFuel()
+            end
+            forward()
+            forward()
             turnRight()
             rawPlant(sapling)
             turnLeft()
@@ -779,10 +789,15 @@ local function plant()
             back()
             rawPlant(sapling)
         elseif length == 3 then
+            if not refuel(8) then
+                notEnoughFuel()
+            end
+            forward()
+            forward()
             turnRight()
             forward()
             forward()
-            plantLeft(sapling, length-1, true, true)
+            plantLeft(sapling, 2, true, true)
             turnLeft()
             rawPlant(sapling)
             back()
@@ -790,6 +805,15 @@ local function plant()
             back()
             rawPlant(sapling)
         else
+            local groups = math.ceil(length/3)
+            local pases = groups + (groups%2 ~= 2 and 1 or 0)
+            local moves = pases * length + length - (length%2 ~= 0 and 1 or 0) + 2
+            if not refuel(moves) then
+                notEnoughFuel()
+            end
+
+            forward()
+            forward()
             turnLeft()
             back()
 
@@ -834,7 +858,7 @@ local function plant()
 
         plantingInfo.last = os.clock()
         plantingInfo.works = plantingInfo.works + 1
-        printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
+        printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")        
     else
         notEnoughSaplings(blocks)
     end
@@ -858,70 +882,48 @@ local function lineCut(blocks, sideA, sideB, turnA, turnB)
     end
 end
 
-local function cutBranch(moves, extra)
+local function cutBranch(moves)
 
-    turnLeft()
-    if detectTreePart() then
-        if extra == 0 then
-            forward()
-            turnRight()
-            moves = cutBranch(moves+1, 0) + 1
-            turnLeft()
-            back()
-        else
-            dig()
-        end
+    local cutAround = function ()
+        turnLeft()
+        if detectTreePart() then dig() end
+        turnRight()
+        turnRight()
+        if detectTreePart() then dig() end
+        turnLeft()
+        if detectTreePart("Up") then digUp() end
+        if detectTreePart("Down") then digDown() end
     end
-    turnRight()
 
-    turnRight()
-    if detectTreePart() then
-        if extra == 0 then
-            forward()
-            turnLeft()
-            moves = cutBranch(moves+1, 0) + 1
-            turnRight()
-            back()
-        else
-            dig()
-        end
-    end
-    turnLeft()
-
-    local lForward = detectTreePart()
-    if lForward then
+    local f = 0
+    while detectTreePart() do
+        cutAround()
         forward()
-        moves = cutBranch(moves+1, extra) + 1
+        f = f + 1
+    end
+    cutAround()
+
+    for i=1, f do
         back()
-    else
-        local lUp = detectTreePart("Up")
-        if lUp then
-            up()
-            moves = cutBranch(moves+1, extra) + 1
-            down()
-        elseif extra > 0 then
-            forward()
-            moves = cutBranch(moves+1, extra-1)
-            up()
-            moves = cutBranch(moves+1, extra-1)
-            down()
-            back()
-            moves = moves + 2
-        end
     end
 
     return moves
 end
 
-local function cutPerimeter(moves)
+local function cutPerimeter(moves, sapling)
     for j=1, 4 do
         for i=1, length do
             if i > 1 then
                 turnLeft()
                 if filteredDetect(":log") or filteredDetect(":leaves") then
-                    forward()
-                    moves = cutBranch(moves+1, 1) + 1
-                    back()
+                    if not sapling or sapling.count < length*length then
+                        forward()
+                        moves = cutBranch(moves+1) + 1
+                        sapling = getMostAbundant(getItems("sapling"))
+                        back()
+                    else
+                        dig()
+                    end
                 end
                 turnRight()
             end
@@ -931,13 +933,18 @@ local function cutPerimeter(moves)
             end
         end
         if filteredDetect(":log") or filteredDetect(":leaves") then
-            forward()
-            moves = cutBranch(moves+1, 1) + 1
-            back()
+            if not sapling or sapling.count < length*length then
+                forward()
+                moves = cutBranch(moves+1) + 1
+                sapling = getMostAbundant(getItems("sapling"))
+                back()
+            else
+                dig()
+            end
         end
         turnRight()
     end
-    return moves
+    return moves, sapling
 end
 
 local function cutInside(moves, far)
@@ -989,16 +996,18 @@ local function cut()
     printn("Cut work in progress..")
     local cutStart = os.clock()
 
+    local sapling = getMostAbundant(getItems("sapling"))
+
     forward()
-    local moves = cutPerimeter(1)
+    local moves, sapling = cutPerimeter(1, sapling)
     while filteredDetect("log", "Up") or filteredDetect("leaves", "Up") do
         up()
-        moves = cutPerimeter(moves+1)
+        moves, sapling = cutPerimeter(moves+1, sapling)
     end
 
     if length < 3 then
         up()
-        moves = cutPerimeter(moves+1)
+        moves, sapling = cutPerimeter(moves+1, sapling)
         moves = moves + 1 + position.y
         while position.y > 0 do down() end
         back()
@@ -1103,18 +1112,30 @@ local function main()
     workbenchSetup()
     while true do
         for i=1, space do forward() end
+
+        if filteredDetect(":sapling") then
+            addBoneMeal()
+        end
+        
         if detectTreePart() then
             cut()
             for i=1, space do back() end
             workbenchSetup()
-            plant()
         elseif not filteredDetect(":sapling") then
             plant()
-            for i=1, space do back() end
+            addBoneMeal()
+            if detectTreePart() then
+                cut()
+                for i=1, space do back() end
+                workbenchSetup()
+            else
+                for i=1, space do back() end
+                sleep(waitTime)                
+            end
         else
             for i=1, space do back() end
+            sleep(waitTime)
         end
-        sleep(waitTime)
     end
 
 end
