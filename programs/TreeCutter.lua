@@ -23,6 +23,7 @@ local length = tArgs[1] and tonumber(tArgs[1]) or 1
 local waitTime = tArgs[2] and tonumber(tArgs[2]) or 15
 local space = tArgs[3] and tonumber(tArgs[3]) or 0
 
+local corners = {left=0, right=length-1, bottom=1+space, top=length+space}
 local position = vector.new(0, 0, 0)
 local rotation = 0
 
@@ -37,12 +38,12 @@ _fuel["minecraft:blaze_rod"] = {power=120, stack=64}
 _fuel["minecraft:coal"] = {power=80, stack=64}
 
 local _sapling = {}
-_sapling[0] = {name="Oak", config={{length=1, space=0}}}
-_sapling[1] = {name="Spruce", config={{length=1, space=0}, {length=2, space=1}}}
-_sapling[2] = {name="Birch", config={{length=1, space=0}}}
-_sapling[3] = {name="Jungle", config={{length=1, space=0}, {length=2, space=1}}}
-_sapling[4] = {name="Acacia", config={{length=1, space=0}}}
-_sapling[5] = {name="Dark Oak", config={{length=2, space=0}}}
+_sapling[0] = {name="Oak", stack=64, config={{length=1, space=0}}}
+_sapling[1] = {name="Spruce", stack=64, config={{length=1, space=0}, {length=2, space=1}}}
+_sapling[2] = {name="Birch", stack=64, config={{length=1, space=0}}}
+_sapling[3] = {name="Jungle", stack=64, config={{length=1, space=0}, {length=2, space=1}}}
+_sapling[4] = {name="Acacia", stack=64, config={{length=1, space=0}}}
+_sapling[5] = {name="Dark Oak", stack=64, config={{length=2, space=0}}}
 
 local function round(n)
     return math.floor(n+0.5)
@@ -62,17 +63,12 @@ local function checkPlantSetup(data)
             end
             if index == 0 then
                 printn(tostring(length).."x"..tostring(length).." is not an appropiate setup for "..info.name.." tree.")
-            end
-            if info.config[index].space > space then
-                printn(info.name.." sapling needs at least "..tostring(info.config[index].space).." empty blocks around.")
+            elseif info.config[index].space > space then
+                printn(info.name.." sapling with "..tostring(length).."x"..tostring(length).." setup, needs at least "..tostring(info.config[index].space).." empty blocks around.")
             end
         end
     end
     return info
-end
-
-local function printPosition()
-    printn("X: "..tostring(position.x)..", Y: "..tostring(position.y)..", Z: "..tostring(position.z))
 end
 
 local function workAreaBlocked(dir)
@@ -109,7 +105,7 @@ end
 local function detectTreePart(dir)
     local turtleInspect = dir and turtle["inspect"..dir] or turtle.inspect
     local detect, data = turtleInspect()
-    return detect and (string.find(data.name, ":log") or string.find(data.name, ":leaves") or string.find(data.name, ":vine"))
+    return detect and (string.find(data.name, ":log") or string.find(data.name, ":leaves"))
 end
 
 local function place(items, dir)
@@ -368,6 +364,18 @@ local function turnBack()
     return turnRight() and turnRight()
 end
 
+local function lookAt(face)
+    if rotation ~= face then
+        if (rotation+90)%360 == face then
+            turnRight()
+        elseif (rotation-90)%360 == face then
+            turnLeft()
+        else
+            turnBack()
+        end
+    end
+end
+
 local function rawDig(dir)
     dir = dir or ""
     if turtle["detect"..dir]() then
@@ -411,7 +419,7 @@ local function forward()
     elseif rotation == 270 then
         position.x = position.x - 1
     else
-        printError("Rotation error!\n")
+        printError("("..tostring(rotation)..") Rotation error!\n")
         os.pullEvent("key")
     end
 end
@@ -435,7 +443,7 @@ local function back()
         elseif rotation == 270 then
             position.x = position.x + 1
         else
-            printError("Rotation error!\n")
+            printError("("..tostring(rotation)..") Rotation error!\n")
             os.pullEvent("key")
         end
     end
@@ -463,6 +471,79 @@ local function down()
     end
 
     position.y = position.y - 1
+end
+
+local function goTo(pos)
+    local height = position.y < pos.y and up or down
+    for i=1, math.abs(pos.y-position.y) do
+        height()
+    end
+
+    if pos.x == position.x and pos.z == position.z then
+        return
+    end
+
+    --pos: 3, 5
+    --position: 4, 4
+
+    local horizontal = pos.x < position.x and 270 or 90
+    local vertical = pos.z < position.z and 180 or 0
+    local order, facing
+
+    if math.abs(horizontal-rotation) < math.abs(vertical-rotation) then
+        order = {math.abs(pos.x-position.x), math.abs(pos.z-position.z)}
+        facing = horizontal
+    else
+        order = {math.abs(pos.z-position.z), math.abs(pos.x-position.x)}
+        facing = vertical
+    end
+
+    lookAt(facing)
+
+    facing = rotation == vertical and horizontal or vertical
+
+    for i=1, order[1] do
+        forward()
+    end
+
+    if (rotation+90)%360 == facing then
+        turnRight()
+    else
+        turnLeft()
+    end
+
+    for i=1, order[2] do
+        forward()
+    end
+end
+
+local function forwardSuck()
+    forward()
+    turtle.suck()
+    if position.y > 0 then
+        turtle.suckDown()
+    end
+end
+
+local function backSuck()
+    back()
+    turtle.suck()
+    if position.y > 0 then
+        turtle.suckDown()
+    end
+end
+
+local function upSuck()
+    up()
+    turtle.suck()
+end
+
+local function downSuck()
+    down()
+    turtle.suck()
+    if position.y > 0 then
+        turtle.suckDown()
+    end
 end
 
 local function chestSetup(dir)
@@ -728,7 +809,7 @@ local function linePlant(sapling, blocks, sideA, sideB, turnA, turnB)
             rawPlant(sapling)
             turnA()
         end
-        back()
+        backSuck()
         rawPlant(sapling)
     end
 end
@@ -744,10 +825,10 @@ end
 local function climbRow(sapling, top, turn)
     turn()
     rawPlant(sapling)
-    back()
+    backSuck()
     rawPlant(sapling)
     if top then
-        back()
+        backSuck()
         rawPlant(sapling)
     end
 end
@@ -761,7 +842,7 @@ local function plant()
     if not sapling or sapling.count < blocks then
         workbenchSetup()
         sapling = getMostAbundant(getItems("sapling"))
-        if not sapling or sapling.count < blocks then
+        while not sapling or sapling.count < blocks do
             notEnoughSaplings(blocks)
         end
     end
@@ -773,56 +854,56 @@ local function plant()
     if length == 1 then
         rawPlant(sapling)
     elseif length == 2 then
-        if not refuel(4) then
+        while not refuel(4) do
             notEnoughFuel()
         end
-        forward()
-        forward()
+        forwardSuck()
+        forwardSuck()
         turnRight()
         rawPlant(sapling)
         turnLeft()
-        back()
+        backSuck()
         rawPlant(sapling)
         turnRight()
         rawPlant(sapling)
         turnLeft()
-        back()
+        backSuck()
         rawPlant(sapling)
     elseif length == 3 then
-        if not refuel(8) then
+        while not refuel(8) do
             notEnoughFuel()
         end
-        forward()
-        forward()
+        forwardSuck()
+        forwardSuck()
         turnRight()
-        forward()
-        forward()
+        forwardSuck()
+        forwardSuck()
         plantLeft(sapling, 2, true, true)
         turnLeft()
         rawPlant(sapling)
-        back()
+        backSuck()
         rawPlant(sapling)
-        back()
+        backSuck()
         rawPlant(sapling)
     else
         local groups = math.ceil(length/3)
         local pases = groups + (groups%2 ~= 2 and 1 or 0)
         local moves = pases * length + length - (length%2 ~= 0 and 1 or 0) + 2
-        if not refuel(moves) then
+        while not refuel(moves) do
             notEnoughFuel()
         end
 
-        forward()
-        forward()
+        forwardSuck()
+        forwardSuck()
         turnLeft()
-        back()
+        backSuck()
 
         local rows = length
         local top, bottom
         while rows > 0 do
             if rows < length then
                 climbRow(sapling, top, turnRight)
-                back()
+                backSuck()
                 turnRight()
             end
 
@@ -834,7 +915,7 @@ local function plant()
             top = rows%3 == 0 and (rows/3)%2 == 1
             bottom = rows > 1
             if bottom then
-                back()
+                backSuck()
             end
             turnLeft()
             plantLeft(sapling, length-2, top, bottom)
@@ -851,7 +932,7 @@ local function plant()
         end
 
         for i=1, rows do
-            back()
+            backSuck()
             rawPlant(sapling)
         end
     end
@@ -861,122 +942,422 @@ local function plant()
     printn("Tree "..tostring(plantingInfo.works).." planted. Waiting...")
 end
 
-local function lineCut(blocks, sideA, sideB, turnA, turnB)
-    for i=1, blocks do
-        if sideB then
-            turnB()
-            dig()
-            turnA()
-        end
-        if sideA then
-            turnA()
-            dig()
-            turnB()
-        end
-        if i < blocks then
-            forward()
-        end
+local function digTreePart(dir)
+    if detectTreePart(dir) then
+        dig()
+        return true
+    end
+    return false
+end
+
+local function expand(shape, dir)
+    dir = dir or rotation
+    if dir == 0 then
+        shape.top = shape.top + 1
+    elseif dir == 90 then
+        shape.right = shape.right + 1
+    elseif dir == 180 then
+        shape.bottom = shape.bottom - 1
+    elseif dir == 270 then
+        shape.left = shape.left - 1
+    end
+    print("Left: "..tostring(shape.left)..", Right: "..tostring(shape.right)..", Bottom: "..tostring(shape.bottom)..", Top: "..tostring(shape.top))
+end
+
+local function contract(shape, dir)
+    print("contract")
+    dir = dir or rotation
+    if dir == 0 then
+        shape.top = math.max(shape.top - 1, corners.top + 1)
+    elseif dir == 90 then
+        shape.right = math.max(shape.right - 1, corners.right + 1)
+    elseif dir == 180 then
+        shape.bottom = math.min(shape.bottom + 1, corners.bottom - 1)
+    elseif dir == 270 then
+        shape.left = math.min(shape.left + 1, corners.left - 1)
     end
 end
 
-local function cutBranch(moves)
+local function printPosition()
+    print("X: "..position.x..", Y: "..position.y..", Z: "..position.z)
+end
 
-    local cutAround = function ()
-        turnLeft()
-        if detectTreePart() then dig() end
-        turnRight()
-        turnRight()
-        if detectTreePart() then dig() end
-        turnLeft()
-        if detectTreePart("Up") then digUp() end
-        if detectTreePart("Down") then digDown() end
+local function cutPerimeter(shape)
+    print("cutPerimeter")
+    local start = vector.new(0, position.y, 0)
+    start.x = math.abs(shape.left-position.x) < math.abs(shape.right-position.x) and shape.left or shape.right
+    start.z = math.abs(shape.bottom-position.z) < math.abs(shape.top-position.z) and shape.bottom or shape.top
+    
+    local moves, facing = math.abs(start.x-position.x) + math.abs(start.z-position.z)
+    goTo(start)
+
+    if position.x == shape.left then
+        facing = position.z == shape.bottom and 270 or 0
+    else
+        facing = position.z == shape.bottom and 180 or 90
     end
+    lookAt(facing)
 
-    local f = 0
-    while detectTreePart() do
-        cutAround()
-        forward()
-        f = f + 1
-    end
-    cutAround()
-
-    for i=1, f do
-        back()
+    for i=1, 4 do
+        digTreePart()
+        turnRight()
+        local size = rotation%180==0 and shape.top-shape.bottom or shape.right-shape.left
+        for j=1, size do
+            forward()
+            turnLeft()
+            digTreePart()
+            turnRight()
+        end
+        moves = moves + size
     end
 
     return moves
 end
 
-local function cutPerimeter(moves, sapling)
-    for j=1, 4 do
-        for i=1, length do
-            if i > 1 then
+local function cutContent(shape)
+    print("cutContent")
+    local moves = 0
+
+    local rows, cols, facing, reverse
+
+    local start = vector.new(0, position.y, 0)
+    start.x = math.abs(shape.left-position.x) < math.abs(shape.right-position.x) and shape.left or shape.right
+    start.z = math.abs(shape.bottom-position.z) < math.abs(shape.top-position.z) and shape.bottom or shape.top
+
+    if shape.right-shape.left > shape.top-shape.bottom then
+        reverse = (start.x == shape.right and start.z == shape.bottom) or (start.x == shape.left and start.z == shape.top)
+        facing = start.x == shape.left and 90 or 270
+        cols = shape.right-shape.left+1
+        rows = shape.top-shape.bottom+1
+        if math.floor(rows/3) > 0 or rows%3 == 2 then
+            start.z = start.z == shape.bottom and start.z + 1 or start.z - 1
+        end
+    else
+        reverse = (start.x == shape.right and start.z == shape.top) or (start.x == shape.left and start.z == shape.bottom)
+        facing = start.z == shape.bottom and 0 or 180
+        cols = shape.top-shape.bottom+1
+        rows = shape.right-shape.left+1
+        if math.floor(rows/3) > 0 or rows%3 == 2 then
+            start.x = start.x == shape.left and start.x + 1 or start.x - 1
+        end
+    end
+
+    moves = moves + math.abs(start.x-position.x) + math.abs(start.z-position.z)
+
+    goTo(start)
+    lookAt(facing)
+
+    local fwd = function ()
+        forward()
+        moves = moves + 1
+    end
+
+    local three = math.floor(rows/3)
+    rows = rows%3
+
+    local turnUp, turnDown
+
+    for i=1, three do
+        turnUp = reverse and turnRight or turnLeft
+        turnDown = reverse and turnLeft or turnRight
+        
+        for j=1, cols-1 do
+            if i == 1 or j > 1 then
+                turnDown()
+                dig()
+                turnUp()
+                turnUp()
+                dig()
+                turnDown()
+            end
+            fwd()
+        end
+
+        turnDown()
+        dig()
+        turnUp()
+        turnUp()
+
+        if i < three then
+            fwd()
+            fwd()
+            fwd()
+            dig()
+            turnUp()
+        elseif rows > 0 then
+            fwd()
+            fwd()
+            if rows > 1 then
+                fwd()
+            end
+            turnUp()
+        else
+            dig()
+            turnDown()
+        end
+
+        reverse = not reverse
+    end
+
+    if rows > 0 then
+        turnUp = reverse and turnRight or turnLeft
+        turnDown = reverse and turnLeft or turnRight
+
+        for i=1, cols do
+            if rows > 1 and (three == 0 or i > 1) then
+                turnDown()
+                dig()
+                turnUp()
+            end
+            if i < cols then
+                fwd()
+            end
+        end
+    end
+
+    return moves
+end
+
+local function cutBranch()
+    local moves = 0
+
+    local pos = 0
+    local startRotation = rotation
+    local startPosition = vector.new(position.x, position.y, position.z)
+    local shape = {left=0, right=0, top=0, bottom=0}
+
+    local fwd = function ()
+        forward()
+        moves = moves + 1
+        local p = position:sub(startPosition)
+        if p.x < shape.left or p.x > shape.right or p.z < shape.bottom or p.z > shape.top then
+            expand(shape)
+        end
+        if rotation == startRotation then
+            pos = pos + 1
+        elseif rotation == (startRotation+180)%360 then
+            pos = pos - 1
+            return pos > 1
+        end
+        return true
+    end
+
+    local left = function ()
+        if rotation == (startRotation-90)%360 then
+            if startRotation == 0 then
+                return position.x <= startPosition.x
+            elseif startRotation == 90 then
+                return position.z >= startPosition.z
+            elseif startRotation == 180 then
+                return position.x >= startPosition.x
+            elseif startRotation == 270 then
+                return position.z <= startPosition.z
+            end
+        end
+        return false
+    end
+
+    local cbr = function ()
+        while detectTreePart() and not left() do
+            turnLeft()
+        end
+
+        if not fwd() then
+            return false
+        end
+
+        turnRight()
+        return true
+    end
+
+    while cbr() do end
+
+    shape.left = shape.left + 1 + startPosition.x
+    shape.right = shape.right - 1 + startPosition.x
+    shape.bottom = shape.bottom + 1 + startPosition.z
+    shape.top = shape.top - 1 + startPosition.z
+    moves = moves + cutContent(shape)
+
+    moves = moves + math.abs(startPosition.x-position.x) + math.abs(startPosition.z-position.z)
+    goTo(startPosition)
+    lookAt(startRotation)
+
+    return moves
+end
+
+local function cutFast()
+    forward()
+    local moves = 1
+
+    if length < 3 then
+        while detectTreePart("Up") do
+            digTreePart()
+            up()
+        end
+        digTreePart()
+
+        local height = position.y
+
+        if length == 2 then
+            turnRight()
+            forward()
+            turnLeft()
+        end
+
+        while position.y > 0 do
+            digTreePart()
+            down()
+        end
+
+        if length == 2 then
+            turnLeft()
+            forward()
+            turnRight()
+        end
+
+        back()
+        moves = height * 2 + 1 + (length == 2 and 2 or 0)
+    else
+        while detectTreePart("Up") do
+            moves = moves + cutContent(corners) + 1
+            up()
+        end
+        moves = moves + cutContent(corners)
+
+        moves = moves + math.abs(position.x) + position.y + math.abs(position.z)
+
+        goTo(vector.new(0,0,0))
+        lookAt(0)
+    end
+
+    return moves
+end
+
+local function cutAverage()
+    forward()
+    local moves = 1
+
+    if length == 1 then
+        local digAll = function()
+            digTreePart()
+            turnLeft()
+            digTreePart()
+            turnLeft()
+            digTreePart()
+            turnLeft()
+            digTreePart()
+            turnLeft()
+        end
+
+        digAll()
+        while detectTreePart("Up") do
+            up()
+            digAll()
+            moves = moves + 1
+        end
+
+        moves = moves + position.y
+        while position.y > 0 do down() end
+
+        back()
+        moves = moves + 1
+    else
+        moves = moves + cutPerimeter(corners)
+        while detectTreePart("Up") do
+            up()
+            moves = moves + cutPerimeter(corners) + 1
+        end
+
+        if length == 2 then
+            moves = moves + position.y + 1
+            while position.y > 0 do down() end
+            back()
+        elseif length == 3 then
+            forward()
+            turnRight()
+            moves = moves + 1 + position.y
+            digTreePart()
+            while position.y > 0 do
+                down()
+                digTreePart()
+            end
+            turnLeft()
+            back()
+            back()
+            moves = moves + 2
+        else
+            moves = moves + position.y
+            while position.y > 0 do
+                moves = moves + cutContent(corners)
+                down()
+            end
+            moves = moves + cutContent(corners)
+    
+            moves = moves + math.abs(position.x) + math.abs(position.z)
+
+            goTo(vector.new(0,0,0))
+            lookAt(0)
+        end
+    end
+
+    return moves
+end
+
+local function cutIntensive()
+    local moves = 0
+    local shape = {left=corners.left-1, right=corners.right+1, top=corners.top+1, bottom=corners.bottom-1}
+    local size = function() return rotation%180 == 0 and shape.top-shape.bottom or shape.right-shape.left end
+
+    turnLeft()
+    forward()
+
+    while true do
+        
+        local goUp = false
+
+        for i=1, 4 do
+            if detectTreePart() then
+                moves = moves + cutBranch()
+            end
+
+            turnRight()
+
+            for j=1, size() do
+                forward()
+                moves = moves + 1
+
+                if i==1 and j==1 then
+                    turnRight()
+                    goUp = detectTreePart()
+                    turnLeft()
+                end
+
                 turnLeft()
-                if filteredDetect(":log") or filteredDetect(":leaves") then
-                    if not sapling or sapling.count < length*length then
-                        forward()
-                        moves = cutBranch(moves+1) + 1
-                        sapling = getMostAbundant(getItems("sapling"))
-                        back()
-                    else
-                        dig()
-                    end
+                if detectTreePart() then
+                    moves = moves + cutBranch()
                 end
                 turnRight()
             end
-            if i < length then
-                forward()
-                moves = moves + 1
-            end
         end
-        if filteredDetect(":log") or filteredDetect(":leaves") then
-            if not sapling or sapling.count < length*length then
-                forward()
-                moves = cutBranch(moves+1) + 1
-                sapling = getMostAbundant(getItems("sapling"))
-                back()
-            else
-                dig()
-            end
+
+        if goUp then
+            up()
+        else
+            break
         end
-        turnRight()
     end
-    return moves, sapling
-end
 
-local function cutInside(moves, far)
-    local sides = 0
-    local cols = length - 2
-    local rows = length - 2
-
-    while rows > 0 do
-        local top = rows > 2
-        local bottom = rows > 1 and (far and position.z > 2 or not far and position.z < length-1)
-        local right = far and sides % 2 == 0
-        local turnA = right and turnLeft or turnRight
-        local turnB = right and turnRight or turnLeft
-
-        lineCut(cols, top, bottom, turnA, turnB)
-        moves = moves + cols - 1
-        rows = rows - 1
-        if top then rows = rows - 1 end
-        if bottom then rows = rows - 1 end
-        turnA()
-        if rows > 0 then
-            if top then
-                forward()
-                moves = moves + 1
-            end
-            forward()
-            moves = moves + 1
-            if rows > 2 then
-                forward()
-                moves = moves + 1
-            end
-        end
-        turnA()
-        sides = sides + 1
+    moves = moves + position.y * 2
+    while position.y > 0 do
+        moves = moves + cutContent(corners)
+        down()
     end
+    moves = moves + cutContent(corners)
+
+    moves = moves + math.abs(position.x) + math.abs(position.z)
+
+    goTo(vector.new(0, 0, 0))
+    lookAt(0)
 
     return moves
 end
@@ -995,98 +1376,14 @@ local function cut()
 
     local sapling = getMostAbundant(getItems("sapling"))
 
-    forward()
-    local moves, sapling = cutPerimeter(1, sapling)
-    while filteredDetect("log", "Up") or filteredDetect("leaves", "Up") do
-        up()
-        moves, sapling = cutPerimeter(moves+1, sapling)
-    end
+    local moves = 0
 
-    if length < 3 then
-        up()
-        moves, sapling = cutPerimeter(moves+1, sapling)
-        moves = moves + 1 + position.y
-        while position.y > 0 do down() end
-        back()
-    elseif length == 3 then
-        forward()
-        turnRight()
-        forward()
-        moves = moves + 2 + position.y
-        while position.y > 0 do down() end
-        back()
-        turnLeft()
-        back()
-        back()
-    elseif length == 4 then
-        forward()
-        turnRight()
-        forward()
-        moves = moves + 2
-        local turnA = turnLeft
-        local turnB = turnRight
-        local height = position.y
-        while true do
-            turnA()
-            dig()
-            turnB()
-            forward()
-            moves = moves + 1
-            turnA()
-            dig()
-            turnA()
-            if position.y > 0 then
-                down()
-                moves = moves + 1
-            else
-                break
-            end
-            turnA = turnA == turnLeft and turnRight or turnLeft
-            turnB = turnB == turnRight and turnLeft or turnRight
-        end
-        if height % 2 == 0 then
-            forward()
-            forward()
-            turnRight()
-            back()
-            back()
-            moves = moves + 4
-        else
-            back()
-            turnLeft()
-            back()
-            back()
-            moves = moves + 3
-        end
-    elseif length > 4 then
-        forward()
-        forward()
-        turnRight()
-        forward()
-        local height = position.y
-        while position.y > 0 do
-            moves = cutInside(moves, (height-position.y) % 2 == 0)
-            down()
-            moves = moves + 1
-        end
-        moves = cutInside(moves, (height-position.y) % 2 == 0)
-        while position.x > 0 do
-            if rotation == 90 then
-                back()
-            else
-                forward()
-            end
-            moves = moves + 1
-        end
-        if rotation == 90 then
-            turnLeft()
-        else
-            turnRight()
-        end
-        while position.z > 0 do
-            back()
-            moves = moves + 1
-        end
+    if not sapling or sapling.count < length*length then
+        moves = cutIntensive()
+    elseif sapling.count < _sapling[sapling[1].damage].stack then
+        moves = cutAverage()
+    else
+        moves = cutFast()
     end
 
     cutingInfo.works = cutingInfo.works + 1
