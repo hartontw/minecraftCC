@@ -4,6 +4,7 @@ local position, rotation
 local blocks, whitelist = {}
 
 local blockFile = "blocks.txt"
+local yieldTime = 5
 
 local function addBlock(pos)
     if not blocks[pos.x] then blocks[pos.x] = {} end
@@ -156,7 +157,7 @@ local function findPath(start, destination, maxNodes)
             return nil
         end
 
-        if os.clock() - s > 1 then
+        if os.clock() - s > yieldTime then
             sleep(0)
             s = os.clock()
         end
@@ -264,6 +265,78 @@ local function lookAt(destination)
     return true
 end
 
+local function goTo(destination)
+    local x = destination.x-position.x
+    local y = destination.y-position.y
+    local z = destination.z-position.z
+ 
+     if x ~= 0 then
+         if x > 0 then
+             lookAt(90)
+         else
+             lookAt(270)
+         end
+         if not forward() then return false end
+     elseif y ~= 0 then
+         if y > 0 then
+             if not up() then return false end
+         else
+             if not down() then return false end
+         end
+     elseif z ~= 0 then
+         if z > 0 then
+             lookAt(180)
+         else
+             lookAt(0)
+         end
+         if not forward() then return false end
+     end
+ 
+     return true
+ end
+
+local function aproach(destination, space)
+    space = space or 0
+
+    if distance(position, destination) > space then
+        print("Aproaching...")
+    end
+
+    while distance(position, destination) > space do
+        local direction = destination - position
+        local moves = 0
+
+        lookAt(direction.x < 0 and 270 or 90)
+        for i=1, math.abs(direction.x) do
+            if not forward() then
+                break
+            end
+            moves = moves + 1
+        end
+
+        local height = direction.y < 0 and down or up
+        for i=1, math.abs(direction.y) do
+            if not height() then
+                break
+            end
+            moves = moves + 1
+        end
+
+        lookAt(direction.z < 0 and 0 or 180)
+        for i=1, math.abs(direction.z) do
+            if not forward() then
+                break
+            end
+            moves = moves + 1
+        end
+
+        if moves == 0 then
+            return false
+        end
+    end
+    return true
+end
+
 local function getTransform(timeOut)
     local rot = 0
     local pos = getPosition(timeOut)
@@ -295,36 +368,6 @@ local function getTransform(timeOut)
     return pos, rot
 end
 
-local function goTo(destination)
-   local x = destination.x-position.x
-   local y = destination.y-position.y
-   local z = destination.z-position.z
-
-    if x ~= 0 then
-        if x > 0 then
-            lookAt(90)
-        else
-            lookAt(270)
-        end
-        if not forward() then return false end
-    elseif y ~= 0 then
-        if y > 0 then
-            if not up() then return false end
-        else
-            if not down() then return false end
-        end
-    elseif z ~= 0 then
-        if z > 0 then
-            lookAt(180)
-        else
-            lookAt(0)
-        end
-        if not forward() then return false end
-    end
-
-    return true
-end
-
 local function goToDestination()
     position, rotation = getTransform(5)
     if not position then
@@ -340,6 +383,7 @@ local function goToDestination()
     print("Destination ("..destination.x..", "..destination.y..", "..destination.z..")")
     print("----------------------------")
 
+    aproach(destination)
     while distance(position, destination) > 0 do
         local path = findPath(position, destination, maxNodes)
         if not path then
@@ -353,6 +397,7 @@ local function goToDestination()
         end
         saveBlocks()
         sleep(0)
+        aproach(destination, 16)
     end
     print("Destination reached!")
 end
