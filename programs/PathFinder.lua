@@ -98,8 +98,10 @@ local function getLower(openList)
         end
     end
 
-    lower.open = false
-    table.remove(openList, l)
+    if lower then
+        lower.open = false
+        table.remove(openList, l)
+    end
 
     return lower
 end
@@ -127,18 +129,21 @@ local function generateAdjacent(nodes, openList, parent, destination)
 end
 
 local function findPath(start, destination, maxNodes)
+    if not available(blocks, destination) then
+        print("Destination is occupied")
+        return nil
+    end
+
+    print("Searching path...")
+
     local parent = createNode(nil, start, destination)
     local nodes, openList = {}, {}
 
     addToNodes(nodes, parent)
     parent.open = false
 
+    local s = os.clock()
     while parent.x ~= destination.x or parent.y ~= destination.y or parent.z ~= destination.z do
-        if not available(blocks, destination) then
-            print("Destination is occupied")
-            return nil
-        end
-
         generateAdjacent(nodes, openList, parent, destination)
         if maxNodes and #openList > maxNodes then
             print("Max nodes limit reached")
@@ -149,6 +154,11 @@ local function findPath(start, destination, maxNodes)
         if not parent then
             print("Destination is not reacheable")
             return nil
+        end
+
+        if os.clock() - s > 1 then
+            sleep(0)
+            s = os.clock()
         end
     end
 
@@ -162,6 +172,8 @@ local function findPath(start, destination, maxNodes)
     for i=#reversePath, 1, -1 do
         path[#path+1] = reversePath[i]
     end
+
+    print("Path found. "..#path.." movements.")
 
     return path
 end
@@ -340,6 +352,7 @@ local function goToDestination()
             end
         end
         saveBlocks()
+        sleep(0)
     end
     print("Destination reached!")
 end
