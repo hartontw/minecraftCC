@@ -3,6 +3,42 @@ local tArgs = {...}
 local position, rotation
 local blocks, whitelist = {}
 
+local blockFile = "blocks.txt"
+
+local function addBlock(pos)
+    if not blocks[pos.x] then blocks[pos.x] = {} end
+    if not blocks[pos.x][pos.y] then blocks[pos.x][pos.y] = {} end
+    blocks[pos.x][pos.y][pos.z] = true
+end
+ 
+local function loadBlocks()
+    if fs.exists(blockFile) then
+        local h = fs.open(blockFile , "r")
+        local line = h.readLine()
+        while line do          
+            local c = {}
+            for i in string.gmatch(line, "%S+") do
+                c[#c+1] = i
+            end
+            addBlock(vector.new(c[1],c[2],c[3]))
+            line = h.readLine()
+        end
+        h.close()
+    end
+end
+ 
+local function saveBlocks()
+    local h = fs.open(blockFile , "w")
+    for i, x in pairs(blocks) do
+        for j, y in pairs(x) do
+            for k, z in pairs(y) do
+                h.writeLine(i.." "..j.." "..k)
+            end
+        end
+    end
+    h.close()
+end
+
 local function getPosition(timeOut)
     local x, y, z = gps.locate(timeOut or 1)
     return x and vector.new(x, y, z) or nil
@@ -16,33 +52,22 @@ local function distance(a, b)
     return math.abs(a.x-b.x) + math.abs(a.y-b.y) + math.abs(a.z-b.z)
 end
 
-local function available(position, list)
-    return not list[position.x] or not list[position.x][position.y] or not list[position.x][position.y][position.z]
+local function available(nodes, position)
+    return not nodes[position.x] or not nodes[position.x][position.y] or not nodes[position.x][position.y][position.z]
 end
 
 local function validBlock(position)
-    return available(position, blocks) or isWhitelisted(blocks[position.x][position.y][position.z])
+    return available(blocks, position) or isWhitelisted(blocks[position.x][position.y][position.z])
 end
 
-local function addToOpen(node, openList)
-    if not openList[node.x] then
-        openList[node.x] = {}
+local function addToNodes(nodes, node)
+    if not nodes[node.x] then
+        nodes[node.x] = {}
     end
-    if not openList[node.x][node.y] then
-        openList[node.x][node.y] = {}
+    if not nodes[node.x][node.y] then
+        nodes[node.x][node.y] = {}
     end
-    openList[node.x][node.y][node.z] = node
-end
-
-local function moveToClosed(node, openList, closedList)
-    if not closedList[node.x] then
-        closedList[node.x] = {}
-    end
-    if not closedList[node.x][node.y] then
-        closedList[node.x][node.y] = {}
-    end
-    closedList[node.x][node.y][node.z] = node
-    openList[node.x][node.y][node.z] = nil
+    nodes[node.x][node.y][node.z] = node
 end
 
 local function createNode(parent, position, destination)
@@ -55,31 +80,41 @@ local function createNode(parent, position, destination)
     node.g = parent and parent.g + 1 or 0
     node.h = distance(destination, node.position())
     node.f = function() return node.g + node.h end
+    node.open = true
     return node
 end
 
-local function getLower(openList, lower)
-    for i, x in pairs(openList) do
-        for j, y in pairs(x) do
-            for k, z in pairs(y) do
-                if not lower or z.f() < lower.f() then
-                    lower = z
-                end
-            end
+local function getLower(openList)
+    local l = #openList
+    local lower = openList[l]
+
+    for i=#openList-1, 1, -1 do
+        local node = openList[i]
+        local nf = node.f()
+        local lf = lower.f()
+        if nf < lf or nf == lf and node.h < lower.h then
+            lower = node
+            l = i
         end
     end
+
+    lower.open = false
+    table.remove(openList, l)
+
     return lower
 end
 
-local function generateAdjacent(parent, destination, openList, closedList)
-    local adjacent = {}
+local function generateAdjacent(nodes, openList, parent, destination)
     local check = function(x, y, z)
         local position = vector.new(x, y, z)
-        if available(position, openList) then
-            if available(position, closedList) then
-                if validBlock(position) then
-                    adjacent[#adjacent+1] = createNode(parent, position, destination)
-                end
+        if validBlock(position) then
+            if available(nodes, position) then
+                local node = createNode(parent, position, destination)
+                addToNodes(nodes, node)
+                openList[#openList+1] = node
+            elseif nodes[x][y][z].open and nodes[x][y][z].g > parent.g + 1 then
+                nodes[x][y][z].g = parent.g + 1
+                nodes[x][y][z].parent = parent
             end
         end
     end
@@ -89,33 +124,31 @@ local function generateAdjacent(parent, destination, openList, closedList)
     check(parent.x, parent.y+1, parent.z)
     check(parent.x, parent.y, parent.z-1)
     check(parent.x, parent.y, parent.z+1)
-    return adjacent
 end
 
-local function findPath(start, destination)
+local function findPath(start, destination, maxNodes)
     local parent = createNode(nil, start, destination)
-    local openList, closedList = {}, {}
+    local nodes, openList = {}, {}
 
-    addToOpen(parent, openList)
+    addToNodes(nodes, parent)
+    parent.open = false
 
     while parent.x ~= destination.x or parent.y ~= destination.y or parent.z ~= destination.z do
-        local nodes = generateAdjacent(parent, destination, openList, closedList)
-        moveToClosed(parent, openList, closedList)
-
-        local lower = nil
-        for _, node in ipairs(nodes) do
-            if not lower or node.f() < lower.f() then
-                lower = node
-            end
-        end
-
-        parent = getLower(openList, lower)
-        if not parent then
+        if not available(blocks, destination) then
+            print("Destination is occupied")
             return nil
         end
 
-        for _, node in ipairs(nodes) do
-            addToOpen(node, openList)
+        generateAdjacent(nodes, openList, parent, destination)
+        if maxNodes and #openList > maxNodes then
+            print("Max nodes limit reached")
+            return nil
+        end
+
+        parent = getLower(openList)
+        if not parent then
+            print("Destination is not reacheable")
+            return nil
         end
     end
 
@@ -131,12 +164,6 @@ local function findPath(start, destination)
     end
 
     return path
-end
-
-local function addBlock(pos)
-    if not blocks[pos.x] then blocks[pos.x] = {} end
-    if not blocks[pos.x][pos.y] then blocks[pos.x][pos.y] = {} end
-    blocks[pos.x][pos.y][pos.z] = true
 end
 
 local function forward()
@@ -286,16 +313,6 @@ local function goTo(destination)
     return true
 end
 
-local function printBlocks()
-    for i, x in pairs(blocks) do
-        for j, y in pairs(x) do
-            for k, z in pairs(y) do
-                print("X: "..i..", Y: "..j..", Z: "..k)
-            end
-        end
-    end
-end
-
 local function goToDestination()
     position, rotation = getTransform(5)
     if not position then
@@ -304,8 +321,15 @@ local function goToDestination()
     end
 
     local destination = vector.new(tonumber(tArgs[1]), tonumber(tArgs[2]), tonumber(tArgs[3]))
+    local maxNodes = tonumber(tArgs[4])
+
+    print("----------------------------")
+    print("Start ("..position.x..", "..position.y..", "..position.z..")")
+    print("Destination ("..destination.x..", "..destination.y..", "..destination.z..")")
+    print("----------------------------")
+
     while distance(position, destination) > 0 do
-        local path = findPath(position, destination)
+        local path = findPath(position, destination, maxNodes)
         if not path then
             print("Not posible path")
             return
@@ -315,8 +339,10 @@ local function goToDestination()
                 break
             end
         end
+        saveBlocks()
     end
-    print("FINISH")
+    print("Destination reached!")
 end
 
+loadBlocks()
 goToDestination()
