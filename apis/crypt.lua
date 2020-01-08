@@ -55,7 +55,5 @@ function RC4(key, text)
 end
 
 function AES(key, text)
-    -- Lua AES Encryption
-    -- @lolmaker2002
-    -- https://pastebin.com/bQMnGjzE
+
 end
