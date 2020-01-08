@@ -59,11 +59,9 @@ function wget(sUrl, sFile)
     return true
 end
 
-local function extractId(paste, patterns)
-    for i = 1, #patterns do
-        local code = paste:match(patterns[i])
-        if code then return code end
-    end
+local function extractId(paste, index)
+    local code = paste:match(services[index].pattern)
+    if code then return code end
     print("Invalid code.")
 end
 
@@ -90,7 +88,7 @@ local function getRawPaste(serviceUrl, serviceName)
 end
 
 function pastebin(paste, sFile)
-    local sCode = paste:match("^([%a%d]+)$") or extractId(paste, services.pastebin.patterns)
+    local sCode = paste:match("^([%a%d]+)$") or extractId(paste, 1)
     if not sCode then return end
 
     if not sFile then
@@ -120,7 +118,7 @@ function pastebin(paste, sFile)
 end
 
 function hastebin(paste, sFile)
-    local sCode = paste:match("^([%a%d]+)$") or extractId(paste, services.pastebin.patterns)
+    local sCode = paste:match("^([%a%d]+)$") or extractId(paste, 2)
     if not sCode then return end
 
     sFile = sFile or sCode
@@ -140,7 +138,7 @@ function hastebin(paste, sFile)
 end
 
 function ghostbin(paste, sFile)
-    local sCode = paste:match("^([%a%d]+)$") or extractId(paste, service.ghostbin.patterns)
+    local sCode = paste:match("^([%a%d]+)$") or extractId(paste, 3)
     if not sCode then return end
 
     sFile = sFile or sCode
@@ -159,35 +157,44 @@ function ghostbin(paste, sFile)
     return true
 end
 
-function githubgist(paste, sFile)
+function gist(paste, sFile)
+    local sCode = extractId(paste, 4)
+    if not sCode then return end
 
+    if not sFile or not sCode:find('/') then
+        local source = getUrl("https://gist.github.com/"..sCode)
+        local user, title = source:gmatch('<a href="/([^/]+)/'..sCode..'">([^<]+)</a>')()
+        sFile = sFile or title
+        sCode = user.."/"..sCode
+    end
+
+    if fs.exists( sFile ) then
+        print( "File already exists" )
+        return
+    end
+
+    local res, response = getRawPaste("https://gist.githubusercontent.com/"..sCode.."/raw")
+    if not response then end
+    
+    local file = writeFile(sFile, response)
+    if not file then return end
+
+    return true
 end
 
 function auto(paste, sFile)
-    for name, service in pairs(services) do
-        for i, pattern in ipairs(service.patterns) do
-            local sCode = paste:match(pattern)
-            if sCode then
-                return service.method(sCode, sFile)
-            end
+    if http.checkURL(paste) then
+        return wget(paste, sFile)
+    end
+    for _, service in ipairs(services) do
+        local sCode = paste:match(service.pattern)
+        if sCode then
+            return service.method(sCode, sFile)
         end
     end
-    return wget(paste, sFile)
 end
 
-services["pastebin"] = {
-    method=pastebin,
-    patterns={"^[%a%d][%a%d][%a%d][%a%d][%a%d][%a%d][%a%d][%a%d]$", "pastebin.com/([%a%d]+)$", "pastebin.com/raw/([%a%d]+)$"}
-}
-services["hastebin"] = {
-    method=hastebin,
-    patterns={"^%l%l%l%l%l%l%l%l%l%l$", "hastebin.com/(%l+)", "hastebin.com/raw/(%l+)"}
-}
-services["ghostbin"] = {
-    method=ghostbin,
-    patterns={"^[%a%d][%a%d][%a%d][%a%d][%a%d]$", "ghostbin.co/paste/([%a%d]+)/?$", "ghostbin.co/paste/([%a%d]+)/download/?$", "ghostbin.co/([%a%d]+)/?$", "ghostbin.co/paste/([%a%d]+)/raw/?$"}
-}
-services["githubgist"] = {
-    method=githubgist,
-    patterns={"[^/]+/?[^/]+/?$", "gist.github.com/[^/]/[^/]/?$"}
-}
+services[1] = { method=pastebin, pattern="^[%a%d][%a%d][%a%d][%a%d][%a%d][%a%d][%a%d][%a%d]$" }
+services[2] = { method=hastebin, pattern="^%l%l%l%l%l%l%l%l%l%l$" }
+services[3] = { method=ghostbin, pattern="^[%a%d][%a%d][%a%d][%a%d][%a%d]$" }
+services[4] = { method=gist, pattern="[^/]+/?[^/]+/?$" }
