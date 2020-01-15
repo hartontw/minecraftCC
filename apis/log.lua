@@ -370,7 +370,7 @@ local function distribute(level, message, ...)
 
   if not group then
     return
-  end  
+  end
 
   if group.print ~= false then
     show(term, level, format(level, message, debugInfo, group.print))
