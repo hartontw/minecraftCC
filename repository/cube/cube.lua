@@ -1,3 +1,5 @@
+print("CUBE")
+
 local username = "hartontw"
 local reponame = "minecraftCC"
 local program_name = "cube"
