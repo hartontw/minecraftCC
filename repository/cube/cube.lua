@@ -21,29 +21,36 @@ end
 
 local function download(path)
     local repository = "https://raw.githubusercontent.com/"..username.."/"..reponame.."/master/repository/"
-    local res, reason = http.get(repository..path)
-    if not res then
-        return false, {
-            name = msg and msg.download_error or "Download error",
-            data = {
-                code = 404,
-                res = reason
-            }
-        }
-    end
-    local code, res = res.getResponseCode()
-    if code ~= 200 then
-        res.close();
+    
+    local code = 404
+    local reason = "Unknown"
+    local response = nil
+
+    response, reason = http.get(repository..path)
+    if not response then
         return false, {
             name = msg and msg.download_error or "Download error",
             data = {
                 code = code,
-                res = res
+                reason = reason
             }
         }
     end
-    local body = res.readAll();
-    res.close();
+
+    code, reason = response.getResponseCode()
+    if code ~= 200 then
+        response.close();
+        return false, {
+            name = msg and msg.download_error or "Download error",
+            data = {
+                code = code,
+                reason = reason
+            }
+        }
+    end
+    
+    local body = response.readAll();
+    response.close();
     return true, body
 end
 
