@@ -48,7 +48,7 @@ local function download(path)
             }
         }
     end
-    
+
     local body = response.readAll();
     response.close();
     return true, body
@@ -234,21 +234,35 @@ local function help()
     print(msg.usage)
 end
 
+local function getMsg()
+    local path = settings.get("paths.messages")
+    local lang = settings.getDetails("locale.lang")
+    local messages = require(path..program_name.."/"..lang.default..".lua")
+    if lang.default ~= lang.value then
+        if fs.exists(path..program_name.."/"..lang.value..".lua") then
+            local translate = require(path..program_name.."/"..lang.value..".lua")
+            for k, v in pairs(translate) do
+                messages[k] = v
+            end
+        end
+    end
+    return messages
+end
+
 local function firstInstall()
     installLocales(program_name)
-    msg = require(paths.locales..settings.get("locale.lang").."/"..program_name..".lua")
+    msg = getMsg();
     print(msg.first_time:gsub("%s", program_name))
     install(program_name);
 end
 
 local info = getInfo(program_name)
-print(info)
 if not info then
     firstInstall()
     return
 end
 
-msg = require(paths.locales..settings.get("locale.lang").."/"..program_name..".lua")
+msg = getMsg()
 local rargs = require(paths.modules.."rargs.lua").new()
 rargs.add({name="help", alias="h", type="flag", description=msg.help})
 rargs.add({name="version", alias="v", type="flag", description=msg.version})
