@@ -1,7 +1,7 @@
 local username = "hartontw"
 local reponame = "minecraftCC"
 local program_name = "cube"
-local paths, msg = {
+local paths = {
     temp = settings.get("path.temp"),
     info = settings.get("path.info"),
     config = settings.get("path.config"),
@@ -10,6 +10,7 @@ local paths, msg = {
     modules = settings.get("path.modules"),
     programs = settings.get("path.programs")
 }
+local msg = nil
 
 local function writeFile(path, content)
     local codeFile = fs.open(path..".lua", "w")
@@ -223,13 +224,15 @@ local function firstInstall()
     install(program_name);
 end
 
+print("HOLA")
 local info = getInfo(program_name)
+print(info)
 if not info then
     firstInstall()
     return
 end
 
-msg = require(paths.locales..settings.get("locale.lang").."/cube.lua")
+msg = require(paths.locales..settings.get("locale.lang").."/"..program_name..".lua")
 local rargs = require(paths.modules.."rargs.lua").new()
 rargs.add({name="help", alias="h", type="flag", description=msg.help})
 rargs.add({name="version", alias="v", type="flag", description=msg.version})
