@@ -88,14 +88,14 @@ end
 
 local function installLocales(name)
     local lang = settings.getDetails("locale.lang")
-    local res, data
-    res, data = downloadLocale(name, lang.default)
+    local res, body
+    res, body = downloadLocale(name, lang.default)
     if not res then return false end
-    writeFile(paths.messages..name.."/"..data)
+    writeFile(paths.messages..name.."/"..lang.default, body)
     if lang.default ~= lang.value then
-        res, data = downloadLocale(name, lang.value)
+        res, body = downloadLocale(name, lang.value)
         if res then
-            writeFile(paths.messages..name.."/"..data)
+            writeFile(paths.messages..name.."/"..lang.value, body)
         end
     end
     return true
