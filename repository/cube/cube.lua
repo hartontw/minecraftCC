@@ -76,14 +76,10 @@ local function downloadLocale(name, lang)
 end
 
 local function getInfo(name)
-    local path = paths.info..name..".lua"
-    if not fs.exists(path) then
+    if not fs.exists(paths.info..name..".lua") then
         return nil
     end
-    local file = fs.open(path, "r")
-    local content = file.readAll()
-    file.close()
-    return require(content)
+    return require(paths.info..name)
 end
 
 local function installLocales(name)
@@ -236,10 +232,10 @@ end
 
 local function getMsg()
     local lang = settings.getDetails("locale.lang")
-    local messages = require(paths.messages..program_name.."/"..lang.default..".lua")
+    local messages = require(paths.messages..program_name.."/"..lang.default)
     if lang.default ~= lang.value then
         if fs.exists(paths.messages..program_name.."/"..lang.value..".lua") then
-            local translate = require(paths.messages..program_name.."/"..lang.value..".lua")
+            local translate = require(paths.messages..program_name.."/"..lang.value)
             for k, v in pairs(translate) do
                 messages[k] = v
             end
@@ -265,7 +261,7 @@ if not info then
 end
 
 msg = getMsg()
-local rargs = require(paths.modules.."rargs.lua").new()
+local rargs = require(paths.modules.."rargs").new()
 rargs.add({name="help", alias="h", type="flag", description=msg.help})
 rargs.add({name="version", alias="v", type="flag", description=msg.version})
 rargs.add({name="update", alias="u", type="flag", description=msg.update})
