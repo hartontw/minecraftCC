@@ -32,7 +32,6 @@ settings.define("locale.timezone", {
     type = "string"
 })
 
---[[
 print("Downloading cube package manager...")
 local cubeFile = http.get()
 local code, res = cubeFile.getResponseCode()
@@ -47,11 +46,10 @@ cubeFile.close()
 local file = fs.open(paths.temp.."install.lua", "w")
 file.write(data)
 file.close()
---]]
 
 print("Running cube...")
-shell.run("wget", "run", "https://github.com/hartontw/minecraftCC/blob/master/repository/cube/cube.lua")
---shell.run(paths.temp.."install.lua")
+--shell.run("wget", "run", "https://github.com/hartontw/minecraftCC/blob/master/repository/cube/cube.lua")
+shell.run(paths.temp.."install.lua")
 
 print("Deleting installation files...")
 fs.delete(paths.temp.."install.lua")
