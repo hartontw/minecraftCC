@@ -117,11 +117,11 @@ local function installDependencies(dependencies)
     for name, version in pairs(dependencies) do
         local currentInfo = getInfo(name)
         if currentInfo and not mayorVersion(currentInfo.version, version) then
-            print(msg.already_satisfied:gsub("%s", name):gsub("%v", currentInfo.version))
+            print(msg.already_satisfied:gsub("$name", name):gsub("$version", currentInfo.version))
         else
-            print(msg.fetching_info:gsub("%s", name))
+            print(msg.fetching_info:gsub("$name", name))
             local remoteInfo = downloadInfo(name)
-            print(msg.installing:gsub("%s", name))
+            print(msg.installing:gsub("$name", name))
             installDependencies(remoteInfo.dependencies)
             installLocales(name)
             writeFile(paths[remoteInfo.category]..name, downloadCode(name))
@@ -134,14 +134,14 @@ local function installDependencies(dependencies)
 end
 
 local function install(name)
-    print(msg.fetching_info:gsub("%s", name))
+    print(msg.fetching_info:gsub("$name", name))
     local currentInfo = getInfo(name)
     local remoteInfo = downloadInfo(name)
     if currentInfo and not mayorVersion(currentInfo.version, remoteInfo.version) then
-        print(msg.already_newest:gsub("%s", name):gsub("%v", currentInfo.version))
+        print(msg.already_newest:gsub("$name", name):gsub("$version", currentInfo.version))
         return false
     end
-    print(msg.installing:gsub("%s", name))
+    print(msg.installing:gsub("$name", name))
     installDependencies(remoteInfo.dependencies)
     installLocales(name)
     writeFile(paths[remoteInfo.category]..name, downloadCode(name))
@@ -155,7 +155,7 @@ end
 local function search(name)
     local info = getInfo(name)
     if not info then
-        print(msg.user..": "..msg.not_installed:gsub("%s", name))
+        print(msg.user..": "..msg.not_installed:gsub("$name", name))
     else
         print(msg.user..": "..name.."("..info.version..")")
     end
@@ -203,7 +203,7 @@ end
 local function remove(name)
     local info = getInfo(name)
     if not info then
-        print(msg.not_installed:gsub("%s", name))
+        print(msg.not_installed:gsub("$name", name))
         return false
     end
     fs.delete(paths.messages..name)
@@ -249,8 +249,8 @@ local function firstInstall()
         print("Locales not found")
         return
     end
-    msg = getMsg();
-    print(msg.first_time:gsub("%s", program_name))
+    msg = getMsg()
+    print(msg.first_time:gsub("$name", program_name))
     install(program_name);
 end
 

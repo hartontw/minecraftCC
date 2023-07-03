@@ -1,5 +1,5 @@
 return {
-    first_time="%s is running for the first time, installing...",
+    first_time="$name is running for the first time, installing...",
     usage= "usage:\t cube <operation> [...]\n" ..
         "operations:\n" ..
         "\tcube {-h --help}\n" ..
@@ -17,13 +17,13 @@ return {
     update= "Updates this program",
     clean= "Remove all orphan dependencies",
     download_error= "Download error",
-    fetching_info="Fetching info for %s",
-    already_newest="%s is already the newest version (%v)",
-    already_satisfied= "Dependency %s is already satisfied (%v)",
-    not_installed="%s is not installed",
-    installing= "Installing %s",
+    fetching_info="Fetching info for $name",
+    already_newest="$name is already the newest version ($version)",
+    already_satisfied= "Dependency $name is already satisfied ($version)",
+    not_installed="$name is not installed",
+    installing= "Installing $name",
     installing_dependencies= "Installing dependencies",
-    not_found= "%s not found",
+    not_found= "$name not found",
     user= "User",
     remote= "Remote"
 }
