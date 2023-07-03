@@ -1,0 +1,7 @@
+{
+    "name": "cat",
+    "category": "programs",
+    "version": "0.0.1",
+    "author": "Harton",
+    "dependencies": [ "rargs", "locale" ]
+}
