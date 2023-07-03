@@ -19,12 +19,21 @@ local function writeFile(path, content)
     codeFile.close();
 end
 
-local function download(url)
+local function download(path)
     local repository = "https://raw.githubusercontent.com/"..username.."/"..reponame.."/master/repository/"
-    local file = http.get(repository..url)
-    local code, res = file.getResponseCode()
+    local res, reason = http.get(repository..path)
+    if not res then
+        return false, {
+            name = msg and msg.download_error or "Download error",
+            data = {
+                code = 404,
+                res = reason
+            }
+        }
+    end
+    local code, res = res.getResponseCode()
     if code ~= 200 then
-        file.close();
+        res.close();
         return false, {
             name = msg and msg.download_error or "Download error",
             data = {
@@ -33,8 +42,8 @@ local function download(url)
             }
         }
     end
-    local body = file.readAll();
-    file.close();
+    local body = res.readAll();
+    res.close();
     return true, body
 end
 
