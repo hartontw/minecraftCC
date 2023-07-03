@@ -6,7 +6,8 @@ Date: 23/06/2023
 --]]
 local rargs = {}
 local program_name = "rargs"
-local msg = require(settings.get("path.locales")..settings.get("locale.lang").."/"..program_name..".lua")
+local locale = require(settings.get("paths.modules").."locale")
+local msg = locale.getMessages(program_name)
 
 function rargs.new()
     local self = {}

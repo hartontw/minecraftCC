@@ -18,6 +18,7 @@ for k, v in pairs(paths) do
     })
     fs.makeDir(v)
 end
+shell.setPath(shell.path()..":"..paths.programs)
 
 print("Generating locales...")
 settings.define("locale.lang", {
@@ -32,36 +33,6 @@ settings.define("locale.timezone", {
     type = "string"
 })
 
---[[
-print("Downloading cube package manager...")
-local cubeFile = http.get()
-local code, res = cubeFile.getResponseCode()
-if code ~= 200 then
-    error({
-        code=code,
-        msg=res
-    })
-end
-local data = cubeFile.readAll()
-cubeFile.close()
-local file = fs.open(paths.temp.."install.lua", "w")
-file.write(data)
-file.close()
---]]
-
 print("Running cube...")
-local success, err = pcall(function() shell.run("wget", "run", "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/cube/cube.lua") end)
-if success then
-    print("Installation complete!")
-else
-    print(err)
-end
-
---shell.run(paths.temp.."install.lua")
-
---[[
-print("Deleting installation files...")
-fs.delete(paths.temp.."install.lua")
-fs.delete("install.lua")
---]]
-
+shell.run("wget", "run", "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/cube/cube.lua")
+print("Installation complete!")
