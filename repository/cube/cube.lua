@@ -235,12 +235,11 @@ local function help()
 end
 
 local function getMsg()
-    local path = settings.get("paths.messages")
     local lang = settings.getDetails("locale.lang")
-    local messages = require(path..program_name.."/"..lang.default..".lua")
+    local messages = require(paths.messages..program_name.."/"..lang.default..".lua")
     if lang.default ~= lang.value then
-        if fs.exists(path..program_name.."/"..lang.value..".lua") then
-            local translate = require(path..program_name.."/"..lang.value..".lua")
+        if fs.exists(paths.messages..program_name.."/"..lang.value..".lua") then
+            local translate = require(paths.messages..program_name.."/"..lang.value..".lua")
             for k, v in pairs(translate) do
                 messages[k] = v
             end
@@ -250,7 +249,10 @@ local function getMsg()
 end
 
 local function firstInstall()
-    installLocales(program_name)
+    if not installLocales(program_name) then
+        print("Locales not found")
+        return
+    end
     msg = getMsg();
     print(msg.first_time:gsub("%s", program_name))
     install(program_name);
