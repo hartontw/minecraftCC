@@ -26,15 +26,15 @@ function rargs.new()
                     if arg:sub(1, 2) == "--" then
                         option = options[name]
                         if not option then
-                            error(msg.option_not_found:gsub("$name", name))
+                            error(msg.option_not_found:gsub("$name", name), 1)
                         end
                     elseif string.len(name) == 1 then
                         option = aliases[name]
                         if not option then
-                            error(msg.invalid_alias:gsub("$name", name))
+                            error(msg.invalid_alias:gsub("$name", name), 1)
                         end
                     else
-                        error(msg.invalid_alias:gsub("$name", name))
+                        error(msg.invalid_alias:gsub("$name", name), 1)
                     end
                     table.insert(arguments, option)
                     table.remove(args, index)
@@ -61,10 +61,10 @@ function rargs.new()
                 for i=1, string.len(flags) do
                     local flag = aliases[flags:sub(i, i)]
                     if not flag then
-                        error(msg.invalid_alias:gsub("$name", flag))
+                        error(msg.invalid_alias:gsub("$name", flag), 1)
                     end
                     if flag.type ~= "flag" then
-                        error(msg.not_a_flag:gsub("$name", flag))
+                        error(msg.not_a_flag:gsub("$name", flag), 1)
                     end
                     table.insert(arguments, flag)
                 end
@@ -80,7 +80,7 @@ function rargs.new()
         if option.type == "number" then
             value = tonumber(value)
             if not value then
-                error(msg.invalid_type:gsub("$name", option.name):gsub("$type", "number"))
+                error(msg.invalid_type:gsub("$name", option.name):gsub("$type", "number"), 1)
             end
         elseif option.type == "boolean" then
             value = string.lower(value)
@@ -89,7 +89,7 @@ function rargs.new()
             elseif value == "false" then
                 value = false
             else
-                error(msg.invalid_type:gsub("$name", option.name):gsub("$type", "boolean"))
+                error(msg.invalid_type:gsub("$name", option.name):gsub("$type", "boolean"), 1)
             end
         end
         option.value = value
@@ -106,18 +106,18 @@ function rargs.new()
                 if arg:sub(1, 2) == "--" then
                     option = options[name]
                     if not option then
-                        error(msg.option_not_found:gsub("$name", name))
+                        error(msg.option_not_found:gsub("$name", name), 1)
                     end
                 elseif string.len(name) == 1 then
                     option = aliases[name]
                     if not option then
-                        error(msg.invalid_alias:gsub("$name", name))
+                        error(msg.invalid_alias:gsub("$name", name), 1)
                     end
                 else
-                    error(msg.invalid_alias:gsub("$name", name))
+                    error(msg.invalid_alias:gsub("$name", name), 1)
                 end
                 if option.type == "strings" then
-                    error(msg.invalid_type:gsub("$name", name):gsub("$type", option.type))
+                    error(msg.invalid_type:gsub("$name", name):gsub("$type", option.type), 1)
                 end
                 setValue(option, value)
                 table.insert(arguments, option)
