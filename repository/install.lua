@@ -50,7 +50,13 @@ file.close()
 --]]
 
 print("Running cube...")
-shell.run("wget", "run", "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/cube/cube.lua")
+local success, err = pcall(function() shell.run("wget", "run", "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/cube/cube.lua") end)
+if success then
+    print("Installation complete!")
+else
+    print(err)
+end
+
 --shell.run(paths.temp.."install.lua")
 
 --[[
@@ -59,4 +65,3 @@ fs.delete(paths.temp.."install.lua")
 fs.delete("install.lua")
 --]]
 
-print("Installation complete!")

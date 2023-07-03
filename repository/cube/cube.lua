@@ -1,16 +1,14 @@
-print("CUBE")
-
 local username = "hartontw"
 local reponame = "minecraftCC"
 local program_name = "cube"
 local paths = {
-    temp = settings.get("path.temp"),
-    info = settings.get("path.info"),
-    config = settings.get("path.config"),
-    locales = settings.get("path.locales"),
-    apis = settings.get("path.apis"),
-    modules = settings.get("path.modules"),
-    programs = settings.get("path.programs")
+    temp = settings.get("paths.temp"),
+    info = settings.get("paths.info"),
+    config = settings.get("paths.config"),
+    locales = settings.get("paths.locales"),
+    apis = settings.get("paths.apis"),
+    modules = settings.get("paths.modules"),
+    programs = settings.get("paths.programs")
 }
 local msg = nil
 
@@ -173,16 +171,16 @@ local function removeOrphan(name)
     if not info or info.category == "programs" then
         return false
     end
-    local all = fs.list(path.info)
+    local all = fs.list(paths.info)
     for index, value in ipairs(all) do
         local i = getInfo(value:sub(1, #value-4))
         if i and i.dependencies and i.dependencies[name] then
             return false
         end
     end
-    fs.delete(path.messages..name)
-    fs.delete(path[info.category]..name..".lua")
-    fs.delete(path.info..name..".lua")
+    fs.delete(paths.messages..name)
+    fs.delete(paths[info.category]..name..".lua")
+    fs.delete(paths.info..name..".lua")
     for k in pairs(info.dependencies) do
         removeOrphan(k)
     end
@@ -195,9 +193,9 @@ local function remove(name)
         print(msg.not_installed:gsub("%s", name))
         return false
     end
-    fs.delete(path.messages..name)
-    fs.delete(path[info.category]..name..".lua")
-    fs.delete(path.info..name..".lua")
+    fs.delete(paths.messages..name)
+    fs.delete(paths[info.category]..name..".lua")
+    fs.delete(paths.info..name..".lua")
     for k in pairs(info.dependencies) do
         removeOrphan(k)
     end
@@ -226,7 +224,6 @@ local function firstInstall()
     install(program_name);
 end
 
-print("HOLA")
 local info = getInfo(program_name)
 print(info)
 if not info then
@@ -244,33 +241,41 @@ rargs.add({name="search", alias="s", type="strings", description=msg.search})
 rargs.add({name="install", alias="i", type="strings", description=msg.install})
 rargs.add({name="remove", alias="r", type="strings", description=msg.remove})
 
-local args = rargs.parse({ ... })
-if args["help"] then
-    help()
-    return
-end
-if args["version"] then
-    print(program_name.."("..info.version..")")
-    return
-end
-if args["update"] then
-    update()
-end
-if args["clean"] then
-    clean()
-end
-if args["search"] then
-    for _, package in ipairs(args["search"].value) do
-        search(package)
+local function main(args)
+    args = rargs.parse(args)
+    if args["help"] then
+        help()
+        return
+    end
+    if args["version"] then
+        print(program_name.."("..info.version..")")
+        return
+    end
+    if args["update"] then
+        update()
+    end
+    if args["clean"] then
+        clean()
+    end
+    if args["search"] then
+        for _, package in ipairs(args["search"].value) do
+            search(package)
+        end
+    end
+    if args["install"] then
+        for _, package in ipairs(args["install"].value) do
+            install(package)
+        end
+    end
+    if args["remove"] then
+        for _, package in ipairs(args["remove"].value) do
+            remove(package)
+        end
     end
 end
-if args["install"] then
-    for _, package in ipairs(args["install"].value) do
-        install(package)
-    end
-end
-if args["remove"] then
-    for _, package in ipairs(args["remove"].value) do
-        remove(package)
-    end
+
+local tArgs = { ... }
+local success, err = pcall(function() main(tArgs) end)
+if not success then
+    print(err)
 end
