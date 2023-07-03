@@ -6,6 +6,7 @@ local paths = {
     info = settings.get("paths.info"),
     config = settings.get("paths.config"),
     locales = settings.get("paths.locales"),
+    messages = settings.get("paths.messages"),
     apis = settings.get("paths.apis"),
     modules = settings.get("paths.modules"),
     programs = settings.get("paths.programs")
