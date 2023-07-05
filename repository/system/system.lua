@@ -54,7 +54,7 @@ local function writeLocales()
 end
 
 function load(api)
-    os.loadAPI(paths.apis..api)
+    os.loadAPI(paths.apis..api..".lua")
 end
 
 function import(module)

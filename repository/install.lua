@@ -2,7 +2,7 @@ local REPO = "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repo
 
 print("Loading system...")
 shell.run("wget", REPO.."system/system.lua")
-os.loadAPI("system")
+os.loadAPI("system.lua")
 
 print("Generating paths...")
 for k, v in pairs(system.paths) do

@@ -1,8 +1,7 @@
 local username = "hartontw"
 local reponame = "minecraftCC"
 local program_name = "cube"
-
-local msg = system.getMessages(program_name)
+local msg
 
 local function writeFile(path, content)
     local file = fs.open(path..".lua", "w")
@@ -246,6 +245,7 @@ local function firstInstall()
         print("Locales not found")
         return
     end
+    msg = system.getMessages(program_name)
     print(msg.first_time:gsub("$name", program_name), "")
     install(program_name);
 end
@@ -256,6 +256,7 @@ if not info then
     return
 end
 
+msg = system.getMessages(program_name)
 local rargs = system.import("rargs").new()
 rargs.add({name="help", alias="h", type="flag", description=msg.help})
 rargs.add({name="version", alias="v", type="flag", description=msg.version})
