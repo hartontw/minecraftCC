@@ -91,7 +91,7 @@ end
 function getMessages(program_name)
     local path = paths.messages
     local lang = settings.getDetails(locales.language)
-    local messages = dofile(path..program_name.."/"..lang.defaul..".lua", _ENV)
+    local messages = dofile(path..program_name.."/"..lang.default..".lua", _ENV)
     if lang.default ~= lang.value then
         if fs.exists(path..program_name.."/"..lang.value..".lua") then
             local translated = dofile(path..program_name.."/"..lang.value..".lua", _ENV)
