@@ -2,7 +2,8 @@ return {
     category= "modules",
     version= "0.0.1",
     author= "Harton",
+    locales = true,
     dependencies = {
-        locale = "0.0.1"
+        system = "0.0.1"
     }
 }

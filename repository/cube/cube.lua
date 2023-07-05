@@ -1,22 +1,13 @@
 local username = "hartontw"
 local reponame = "minecraftCC"
 local program_name = "cube"
-local paths = {
-    temp = settings.get("paths.temp"),
-    info = settings.get("paths.info"),
-    config = settings.get("paths.config"),
-    locales = settings.get("paths.locales"),
-    messages = settings.get("paths.messages"),
-    apis = settings.get("paths.apis"),
-    modules = settings.get("paths.modules"),
-    programs = settings.get("paths.programs")
-}
-local msg = nil
+
+local msg = system.getMessages(program_name)
 
 local function writeFile(path, content)
-    local codeFile = fs.open(path..".lua", "w")
-    codeFile.write(content)
-    codeFile.close();
+    local file = fs.open(path..".lua", "w")
+    file.write(content)
+    file.close();
 end
 
 local function download(path)
@@ -29,11 +20,8 @@ local function download(path)
     response, reason = http.get(repository..path)
     if not response then
         return false, {
-            name = msg and msg.download_error or "Download error",
-            data = {
-                code = code,
-                reason = reason
-            }
+            code = code,
+            reason = reason
         }
     end
 
@@ -41,11 +29,8 @@ local function download(path)
     if code ~= 200 then
         response.close();
         return false, {
-            name = msg and msg.download_error or "Download error",
-            data = {
-                code = code,
-                reason = reason
-            }
+            code = code,
+            reason = reason
         }
     end
 
@@ -57,7 +42,8 @@ end
 local function downloadCode(name)
     local res, data = download(name.."/"..name..".lua")
     if not res then
-        error(data)
+        print(data.code, data.reason)
+        return false
     end
     return data
 end
@@ -65,33 +51,33 @@ end
 local function downloadInfo(name)
     local res, data = download(name.."/info.lua")
     if not res then
-        error(data)
+        print(data.code, data.reason)
+        return false
     end
-    writeFile(paths.temp..name, data)
-    return require(paths.temp..name)
-end
-
-local function downloadLocale(name, lang)
-    return download(name.."/locale/"..lang..".lua")
+    writeFile(system.pahts.temp..name, data)
+    return true, require(system.paths.temp..name)
 end
 
 local function getInfo(name)
-    if not fs.exists(paths.info..name..".lua") then
+    if not fs.exists(system.paths.info..name..".lua") then
         return nil
     end
-    return require(paths.info..name)
+    return require(system.paths.info..name)
 end
 
 local function installLocales(name)
-    local lang = settings.getDetails("locale.lang")
-    local res, body
-    res, body = downloadLocale(name, lang.default)
-    if not res then return false end
-    writeFile(paths.messages..name.."/"..lang.default, body)
+    local lang = system.getLanguage(true)
+    local res, data
+    res, data = download(name.."/locale/"..lang.default..".lua")
+    if not res then
+        print(data.code, data.reason)
+        return false
+    end
+    writeFile(system.paths.messages..name.."/"..lang.default, data)
     if lang.default ~= lang.value then
-        res, body = downloadLocale(name, lang.value)
+        res, data = download(name.."/locale/"..lang.value..".lua")
         if res then
-            writeFile(paths.messages..name.."/"..lang.value, body)
+            writeFile(system.paths.messages..name.."/"..lang.value, data)
         end
     end
     return true
@@ -110,9 +96,10 @@ local function mayorVersion(current, remote)
 end
 
 local function installDependencies(dependencies)
-    if not dependencies then
+    if not dependencies or #dependencies == 0 then
         return
     end
+    local res, remoteInfo, code
     print(msg.installing_dependencies)
     for name, version in pairs(dependencies) do
         local currentInfo = getInfo(name)
@@ -120,39 +107,51 @@ local function installDependencies(dependencies)
             print(msg.already_satisfied:gsub("$name", name):gsub("$version", currentInfo.version), "")
         else
             print(msg.fetching_info:gsub("$name", name), "")
-            local remoteInfo = downloadInfo(name)
+            res, remoteInfo = downloadInfo(name)
+            if not res then return false end
             print(msg.installing:gsub("$name", name), "")
             installDependencies(remoteInfo.dependencies)
-            installLocales(name)
-            writeFile(paths[remoteInfo.category]..name, downloadCode(name))
-            if fs.exists(paths.info..name..".lua") then
-                fs.delete(paths.info..name..".lua")
+            if remoteInfo.locales and not installLocales(name) then
+                return false
             end
-            fs.move(paths.temp..name..".lua", paths.info..name..".lua")
+            res, code = downloadCode(name)
+            if not res then return false end
+            writeFile(system.paths[remoteInfo.category]..name, code)
+            if fs.exists(system.paths.info..name..".lua") then
+                fs.delete(system.paths.info..name..".lua")
+            end
+            fs.move(system.paths.temp..name..".lua", system.paths.info..name..".lua")
         end
     end
 end
 
 local function install(name)
+    local res, remoteInfo, code
     print(msg.fetching_info:gsub("$name", name), "")
     local currentInfo = getInfo(name)
-    local remoteInfo = downloadInfo(name)
+    res, remoteInfo = downloadInfo(name)
+    if not res then return false end
     if currentInfo and not mayorVersion(currentInfo.version, remoteInfo.version) then
         print(msg.already_newest:gsub("$name", name):gsub("$version", currentInfo.version), "")
         return false
     end
     print(msg.installing:gsub("$name", name), "")
     installDependencies(remoteInfo.dependencies)
-    installLocales(name)
-    writeFile(paths[remoteInfo.category]..name, downloadCode(name))
-    if fs.exists(paths.info..name..".lua") then
-        fs.delete(paths.info..name..".lua")
+    if remoteInfo.locales and not installLocales(name) then
+        return false
     end
-    fs.move(paths.temp..name..".lua", paths.info..name..".lua")
+    res, code = downloadCode(name)
+    if not res then return false end
+    writeFile(system.paths[remoteInfo.category]..name, code)
+    if fs.exists(system.paths.info..name..".lua") then
+        fs.delete(system.paths.info..name..".lua")
+    end
+    fs.move(system.paths.temp..name..".lua", system.paths.info..name..".lua")
     return true
 end
 
 local function search(name)
+    local res, data
     local info = getInfo(name)
     if not info then
         print(msg.user..": "..msg.not_installed:gsub("$name", name), "")
@@ -160,44 +159,56 @@ local function search(name)
         print(msg.user..": "..name.."("..info.version..")")
     end
     local repoTree = "https://api.github.com/repos/"..username.."/"..reponame.."/git/trees/master"
-    local body = download(repoTree)
-    local tree = textutils.unserialiseJSON(body).tree
+    res, data = download(repoTree)
+    if not res then
+        print(data.code, data.reason)
+        return false
+    end
+    local tree = textutils.unserialiseJSON(data).tree
     for _, v in ipairs(tree) do
         if v.path == "repository" then
-            body = download(v.url)
+            res, data = download(v.url)
+            if not res then
+                print(data.code, data.reason)
+                return false
+            end
             break
         end
     end
-    tree = textutils.unserialiseJSON(body).tree
+    tree = textutils.unserialiseJSON(data).tree
     for _, v in ipairs(tree) do
         if v.path == name..".lua" then
-            local remoteInfo = downloadInfo(name)
-            print(msg.remote..": "..name.."("..remoteInfo.version..")")
-            return
+            res, data = downloadInfo(name)
+            if not res then
+                print(data.code, data.reason)
+                return false
+            end
+            print(msg.remote..": "..name.."("..data.version..")")
+            return true
         end
     end
     print(msg.remote..": "..msg.not_found)
+    return true
 end
 
 local function removeOrphan(name)
     local info = getInfo(name)
     if not info or info.category == "programs" then
-        return false
+        return
     end
-    local all = fs.list(paths.info)
-    for index, value in ipairs(all) do
-        local i = getInfo(value:sub(1, #value-4))
+    local all = fs.list(system.paths.info)
+    for _, value in ipairs(all) do
+        local i = getInfo(value:sub(1, string.len(value-4)))
         if i and i.dependencies and i.dependencies[name] then
-            return false
+            return
         end
     end
-    fs.delete(paths.messages..name)
-    fs.delete(paths[info.category]..name..".lua")
-    fs.delete(paths.info..name..".lua")
+    fs.delete(system.paths.messages..name)
+    fs.delete(system.paths[info.category]..name..".lua")
+    fs.delete(system.paths.info..name..".lua")
     for k in pairs(info.dependencies) do
         removeOrphan(k)
     end
-    return true
 end
 
 local function remove(name)
@@ -206,9 +217,9 @@ local function remove(name)
         print(msg.not_installed:gsub("$name", name), "")
         return false
     end
-    fs.delete(paths.messages..name)
-    fs.delete(paths[info.category]..name..".lua")
-    fs.delete(paths.info..name..".lua")
+    fs.delete(system.paths.messages..name)
+    fs.delete(system.paths[info.category]..name..".lua")
+    fs.delete(system.paths.info..name..".lua")
     for k in pairs(info.dependencies) do
         removeOrphan(k)
     end
@@ -220,9 +231,9 @@ local function update()
 end
 
 local function clean()
-    local libraries = table.concat(fs.list(paths.apis), fs.list(paths.modules))
-    for i, lib in ipairs(libraries) do
-        removeOrphan(lib:sub(1, #lib-4)) --.lua
+    local libraries = table.concat(fs.list(system.paths.apis), fs.list(system.paths.modules))
+    for _, lib in ipairs(libraries) do
+        removeOrphan(lib:sub(1, string.len(lib-4))) --.lua
     end
 end
 
@@ -230,26 +241,11 @@ local function help()
     print(msg.usage)
 end
 
-local function getMsg()
-    local lang = settings.getDetails("locale.lang")
-    local messages = require(paths.messages..program_name.."/"..lang.default)
-    if lang.default ~= lang.value then
-        if fs.exists(paths.messages..program_name.."/"..lang.value..".lua") then
-            local translate = require(paths.messages..program_name.."/"..lang.value)
-            for k, v in pairs(translate) do
-                messages[k] = v
-            end
-        end
-    end
-    return messages
-end
-
 local function firstInstall()
     if not installLocales(program_name) then
         print("Locales not found")
         return
     end
-    msg = getMsg()
     print(msg.first_time:gsub("$name", program_name), "")
     install(program_name);
 end
@@ -260,8 +256,7 @@ if not info then
     return
 end
 
-msg = getMsg()
-local rargs = require(paths.modules.."rargs").new()
+local rargs = system.import("rargs").new()
 rargs.add({name="help", alias="h", type="flag", description=msg.help})
 rargs.add({name="version", alias="v", type="flag", description=msg.version})
 rargs.add({name="update", alias="u", type="flag", description=msg.update})

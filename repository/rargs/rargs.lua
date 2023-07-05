@@ -29,6 +29,12 @@ function rargs.new()
                         if not option then
                             error(msg.option_not_found:gsub("$name", name), 1)
                         end
+                        if option.type ~= "strings" then
+                            option = nil
+                            index = index + 1
+                        else
+                            option.value = {}
+                        end
                     elseif string.len(name) == 1 then
                         option = aliases[name]
                         if not option then
@@ -62,7 +68,7 @@ function rargs.new()
                 for i=1, string.len(flags) do
                     local flag = aliases[flags:sub(i, i)]
                     if not flag then
-                        error(msg.invalid_alias:gsub("$name", flag), 1)
+                        error(msg.invalid_alias:gsub("$name", flags:sub(i, i)), 1)
                     end
                     if flag.type ~= "flag" then
                         error(msg.not_a_flag:gsub("$name", flag), 1)
@@ -142,12 +148,12 @@ function rargs.new()
         local positional = {}
 
         local single = searchSingle(args)
-        local flags = searchFlags(args)
         local multi = searchMulti(args)
+        local flags = searchFlags(args)
 
-        for _, arg in single do arguments[arg.name] = arg end
-        for _, arg in flags do arguments[arg.name] = arg end
-        for _, arg in multi do arguments[arg.name] = arg end
+        for _, arg in ipairs(single) do arguments[arg.name] = arg end
+        for _, arg in ipairs(flags) do arguments[arg.name] = arg end
+        for _, arg in ipairs(multi) do arguments[arg.name] = arg end
         for _, arg in ipairs(args) do table.insert(positional, arg) end
 
         return arguments, positional

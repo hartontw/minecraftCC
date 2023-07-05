@@ -1,38 +1,19 @@
-local paths = {
-    temp = "/usr/temp/",
-    info = "/usr/info/",
-    config = "/usr/config/",
-    locales = "/usr/locales/",
-    messages = "/usr/locales/messages/",
-    apis = "/usr/apis/",
-    modules = "/usr/modules/",
-    programs = "/usr/programs/"
-}
+local REPO = "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/"
+
+print("Loading system...")
+shell.run("wget", "run", REPO.."system/system.lua")
+os.loadAPI("system")
 
 print("Generating paths...")
-for k, v in pairs(paths) do
-    settings.define("paths."..k, {
-        default = v,
-        description = "Path to "..k.." files",
-        type = "string",
-    })
+for k, v in pairs(system.paths) do
     fs.makeDir(v)
 end
-shell.setPath(shell.path()..":"..paths.programs)
-
-print("Generating locales...")
-settings.define("locale.lang", {
-    default = "en",
-    description = "System language",
-    type = "string"
-})
-
-settings.define("locale.timezone", {
-    default = "UTC",
-    description = "Time zone",
-    type = "string"
-})
+shell.setPath(shell.path()..":"..system.paths.programs)
 
 print("Running cube...")
-shell.run("wget", "run", "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/cube/cube.lua")
+shell.run("wget", "run", REPO.."cube/cube.lua")
+
+print("Installing startup script...")
+shell.run("wget", REPO.."startup.lua")
+
 print("Installation complete!")

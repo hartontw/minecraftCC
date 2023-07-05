@@ -2,7 +2,10 @@ return {
     category= "programs",
     version= "0.0.1",
     author= "Harton",
+    locales= true,
     dependencies= {
-        rargs = "0.0.1"
+        system = "1.0.0",
+        rargs = "0.0.1",
+        logs = "0.0.1"
     }
 }
