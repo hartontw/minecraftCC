@@ -11,6 +11,20 @@ local PATHS = {
     home = "/home/"
 }
 
+local function getData(path)
+    if not fs.exists(path) then return nil end
+    local file = fs.open(path, "r")
+    local data = textutils.unserialize(file.readAll())
+    file.close()
+    return data
+end
+
+local function setData(path, data)
+    local file = fs.open(path, "w")
+    file.write(textutils.serialize(data))
+    file.close()
+end
+
 paths = setmetatable({}, {
     __index = function(_, k) return PATHS[k] end,
     __pairs = function(_)
@@ -28,13 +42,7 @@ paths = setmetatable({}, {
 locales = setmetatable({}, {
     __index = function(_, k)
         if not LOCALES then
-            if fs.exists(paths.config.."locales.lua") then
-                local file = fs.open(paths.config.."locales.lua", "r")
-                LOCALES = textutils.unserialize(file.readAll())
-                file.close()
-                return
-            end
-            LOCALES = {
+            LOCALES = getData(paths.config.."locales.lua") or {
                 language = {
                     default = "en",
                     description = "System language",
@@ -53,9 +61,7 @@ locales = setmetatable({}, {
     end,
     __newindex = function(_, k, v)
         LOCALES[k] = v
-        local file = fs.open(paths.config.."locales.lua", "w")
-        file.write(textutils.serialize(LOCALES))
-        file.close()
+        setData(paths.config.."locales.lua", LOCALES)
     end
 });
 
@@ -75,16 +81,23 @@ function run(program, args)
     end
 end
 
+function loadConfig(name)
+    return getData(PATHS.config..name..".lua")
+end
+
+function writeConfig(name, data)
+    setData(PATHS.config..name, data)
+end
+
 function getMessages(program_name)
     local path = paths.messages
     local lang = LOCALES.language
-    local messages = dofile(path..program_name.."/"..lang.default..".lua", _ENV)
-    if lang.default ~= lang.value then
-        if fs.exists(path..program_name.."/"..lang.value..".lua") then
-            local translated = dofile(path..program_name.."/"..lang.value..".lua", _ENV)
-            for k, v in pairs(translated) do
-                messages[k] = v
-            end
+    local messages = getData(path..program_name.."/"..lang.default..".lua")
+    if lang.default == lang.value then return messages end
+    local translated = getData(path..program_name.."/"..lang.value..".lua")
+    if translated then
+        for k, v in pairs(translated) do
+            messages[k] = v
         end
     end
     return messages
