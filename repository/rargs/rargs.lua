@@ -20,11 +20,8 @@ function rargs.new()
         local option = nil
         while index <= #args do
             local arg = args[index]
-            print(arg) sleep(1)
             if not option then
                 local name = arg:match("^%-*(.+)$")
-                print(name)
-                sleep(1)
                 if name then
                     if arg:sub(1, 2) == "--" then
                         option = options[name]
