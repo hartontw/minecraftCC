@@ -20,19 +20,16 @@ function rargs.new()
         local option = nil
         while index <= #args do
             local arg = args[index]
+            print(arg) sleep(1)
             if not option then
                 local name = arg:match("^%-*(.+)$")
+                print(name)
+                sleep(1)
                 if name then
                     if arg:sub(1, 2) == "--" then
                         option = options[name]
                         if not option then
                             error(msg.option_not_found:gsub("$name", name), 1)
-                        end
-                        if option.type ~= "strings" then
-                            option = nil
-                            index = index + 1
-                        else
-                            option.value = {}
                         end
                     elseif string.len(name) == 1 then
                         option = aliases[name]
@@ -42,8 +39,14 @@ function rargs.new()
                     else
                         error(msg.invalid_alias:gsub("$name", name), 1)
                     end
-                    table.insert(arguments, option)
-                    table.remove(args, index)
+                    if option.type == "strings" then
+                        option.value = {}
+                        table.insert(arguments, option)
+                        table.remove(args, index)
+                    else
+                        option = nil
+                        index = index + 1
+                    end
                 else
                     index = index + 1
                 end
