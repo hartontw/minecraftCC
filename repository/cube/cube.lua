@@ -153,7 +153,7 @@ local function search(name)
         print(msg.user..": "..name.."("..info.version..")")
     end
     local repoTree = "https://api.github.com/repos/"..username.."/"..reponame.."/git/trees/master"
-    res, data = download(repoTree)
+    res, data = http.get(repoTree)
     if not res then
         print(data.code, data.reason)
         return false
@@ -161,7 +161,7 @@ local function search(name)
     local tree = textutils.unserialiseJSON(data).tree
     for _, v in ipairs(tree) do
         if v.path == "repository" then
-            res, data = download(v.url)
+            res, data = http.get(v.url)
             if not res then
                 print(data.code, data.reason)
                 return false
