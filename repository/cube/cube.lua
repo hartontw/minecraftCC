@@ -95,9 +95,6 @@ local function mayorVersion(current, remote)
 end
 
 local function installDependencies(dependencies)
-    if not dependencies or #dependencies == 0 then
-        return true
-    end
     print(msg.installing_dependencies)
     for name, version in pairs(dependencies) do
         local currentInfo = getInfo(name)
@@ -108,7 +105,7 @@ local function installDependencies(dependencies)
             local remoteInfo = downloadInfo(name)
             if not remoteInfo then return false end
             print(msg.installing:gsub("$name", name), "")
-            if not installDependencies(remoteInfo.dependencies) then
+            if remoteInfo.dependencies and not installDependencies(remoteInfo.dependencies) then
                 return false
             end
             if remoteInfo.locales and not installLocales(name) then
@@ -133,7 +130,7 @@ local function install(name)
         return false
     end
     print(msg.installing:gsub("$name", name), "")
-    if not installDependencies(remoteInfo.dependencies) then
+    if remoteInfo.dependencies and not installDependencies(remoteInfo.dependencies) then
         return false
     end
     if remoteInfo.locales and not installLocales(name) then
