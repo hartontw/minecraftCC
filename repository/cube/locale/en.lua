@@ -25,5 +25,6 @@
     installing_dependencies= "Installing dependencies",
     not_found= "$name not found",
     user= "User",
-    remote= "Remote"
+    remote= "Remote",
+    is_a_dependency = "$name is a dependency of $package"
 }

@@ -54,11 +54,12 @@ local function downloadInfo(name)
     return textutils.unserialise(data)
 end
 
-local function getInfo(name)
-    if not fs.exists(system.paths.info..name..".lua") then
+local function getInfo(name, extension)
+    local path = system.paths.info..name..(not extension and ".lua" or "")
+    if not fs.exists(path) then
         return nil
     end
-    local file = fs.open(system.paths.info..name..".lua", "r")
+    local file = fs.open(path, "r")
     local info = textutils.unserialise(file.readAll())
     file.close()
     return info
@@ -191,7 +192,7 @@ local function removeOrphan(name)
     end
     local all = fs.list(system.paths.info)
     for _, value in ipairs(all) do
-        local i = getInfo(value:sub(1, string.len(value)-4)) --.lua
+        local i = getInfo(value, true)
         if i and i.dependencies and i.dependencies[name] then
             return
         end
@@ -211,6 +212,14 @@ local function remove(name)
     if not info then
         print(msg.not_installed:gsub("$name", name), "")
         return false
+    end
+    local files = fs.list(system.paths.info)
+    for _, file in ipairs(files) do
+        local package = getInfo(file, true)
+        if package.dependencies and package.dependencies[name] then
+            print(msg.is_a_dependency:gsub("$name", name):gsub("$package", file:sub(1, string.len(file)-4)), "") -- .lua
+            return false
+        end
     end
     fs.delete(system.paths.info..name..".lua")
     fs.delete(system.paths[info.category]..name..".lua")

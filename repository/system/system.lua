@@ -89,6 +89,10 @@ function writeConfig(name, data)
     setData(PATHS.config..name, data)
 end
 
+function loadInfo(name)
+    return getData(PATHS.info..name..".lua")
+end
+
 function getMessages(program_name)
     local path = paths.messages
     local lang = locales.language
