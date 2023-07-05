@@ -191,7 +191,7 @@ local function removeOrphan(name)
     end
     local all = fs.list(system.paths.info)
     for _, value in ipairs(all) do
-        local i = getInfo(value:sub(1, string.len(value-4)))
+        local i = getInfo(value:sub(1, string.len(value)-4)) --.lua
         if i and i.dependencies and i.dependencies[name] then
             return
         end
@@ -230,7 +230,7 @@ end
 local function clean()
     local libraries = table.concat(fs.list(system.paths.apis), fs.list(system.paths.modules))
     for _, lib in ipairs(libraries) do
-        removeOrphan(lib:sub(1, string.len(lib-4))) --.lua
+        removeOrphan(lib:sub(1, string.len(lib)-4)) --.lua
     end
 end
 
