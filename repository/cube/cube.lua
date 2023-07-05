@@ -234,8 +234,12 @@ local function update()
 end
 
 local function clean()
-    local libraries = table.concat(fs.list(system.paths.apis), fs.list(system.paths.modules))
-    for _, lib in ipairs(libraries) do
+    local apis = fs.list(system.paths.apis)
+    for _, lib in ipairs(apis) do
+        removeOrphan(lib:sub(1, string.len(lib)-4)) --.lua
+    end
+    local modules = fs.list(system.paths.modules)
+    for _, lib in ipairs(modules) do
         removeOrphan(lib:sub(1, string.len(lib)-4)) --.lua
     end
 end
