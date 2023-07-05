@@ -65,7 +65,7 @@ local function getInfo(name)
 end
 
 local function installLocales(name)
-    local lang = system.getLanguage(true)
+    local lang = system.locales.language
     local res, data
     res, data = download(name.."/locale/"..lang.default..".lua")
     if not res then

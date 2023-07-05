@@ -5,8 +5,9 @@ shell.run("wget", REPO.."system/system.lua")
 os.loadAPI("system.lua")
 
 print("Generating paths...")
-for k, v in pairs(system.paths) do
+for _, v in pairs(system.paths) do
     fs.makeDir(v)
+    print(v)
 end
 shell.setPath(shell.path()..":"..system.paths.programs)
 
@@ -20,5 +21,7 @@ print("Deleting installation files...")
 fs.delete("system.lua")
 
 print("Installation complete!")
-sleep(2)
+sleep(1)
+print("Reboot 5s...")
+sleep(5)
 os.reboot()

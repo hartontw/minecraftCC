@@ -1,57 +1,63 @@
-local locales = {
-    language = "locales.language",
-    timezone = "locales.timezone"
+local LOCALES = nil
+local PATHS = {
+    info = "/usr/info/",
+    config = "/usr/config/",
+    temp = "/usr/temp/",
+    locales = "/usr/locales/",
+    messages = "/usr/locales/messages/",
+    apis = "/usr/apis/",
+    modules = "/usr/modules/",
+    programs = "/usr/programs/",
+    home = "/home/"
 }
 
 paths = setmetatable({}, {
-    __index = {
-        info = "/usr/info/",
-        config = "/usr/config/",
-        temp = "/usr/temp/",
-        locales = "/usr/locales/",
-        messages = "/usr/locales/messages/",
-        apis = "/usr/apis/",
-        modules = "/usr/modules/",
-        programs = "/usr/programs/",
-        home = "/home/"
-    },
-    __newindex = function(table, key, value)
-                   error("Attempt to modify read-only table")
-                 end,
+    __index = function(_, k) return PATHS[k] end,
+    __pairs = function(_)
+        local function iter(_, k)
+            local v
+            k, v = next(PATHS, k)
+            if v ~= nil then return k, v end
+        end
+        return iter, PATHS, nil
+    end,
+    __newindex = function() error("system.paths is read only") end,
     __metatable = false
 });
 
-local function defaultLocaleSettings()
-    if settings.get(locales.language) then return end
-    settings.define(locales.language, {
-        default = "en",
-        description = "System language",
-        type = "string"
-    })
-    settings.define(locales.timezone, {
-        default = "UTC",
-        description = "System timezone",
-        type = "string"
-    })
-end
-
-function loadLocales()
-    defaultLocaleSettings()
-    if fs.exists(paths.config.."locales.lua") then
-        local config = dofile(paths.config.."locales"..".lua", _ENV)
-        settings.set(locales.language, config.language)
-        settings.set(locales.timezone, config.timezone)
+locales = setmetatable({}, {
+    __index = function(_, k)
+        if not LOCALES then
+            if fs.exists(paths.config.."locales.lua") then
+                local file = fs.open(paths.config.."locales.lua", "r")
+                LOCALES = textutils.unserialize(file.readAll())
+                file.close()
+                return
+            end
+            LOCALES = {
+                language = {
+                    default = "en",
+                    description = "System language",
+                    type = "string",
+                    value = "en"
+                },
+                timezone = {
+                    default = "UTC",
+                    description = "System timezone",
+                    type = "string",
+                    value = "UTC"
+                }
+            }
+        end
+        return LOCALES[k]
+    end,
+    __newindex = function(_, k, v)
+        LOCALES[k] = v
+        local file = fs.open(paths.config.."locales.lua", "w")
+        file.write(textutils.serialize(LOCALES))
+        file.close()
     end
-end
-
-local function writeLocales()
-    local localeFile = fs.open(paths.config.."locales.lua", "w")
-    localeFile.write("return {\n")
-    localeFile.write("lang=\""..settings.get(locales.language).."\",\n")
-    localeFile.write("timezone=\""..settings.get(locales.timezone).."\"\n")
-    localeFile.write("}\n")
-    localeFile.close()
-end
+});
 
 function load(api)
     os.loadAPI(paths.apis..api..".lua")
@@ -69,28 +75,9 @@ function run(program, args)
     end
 end
 
-function getLanguage(details)
-    if details then
-        return settings.getDetails(locales.language)
-    end
-    return settings.get(locales.language)
-end
-
-function setLanguage(language)
-    settings.set(locales.language, language)
-    writeLocales()
-end
-
-function getTimezone(details)
-    if details then
-        return settings.getDetails(locales.timezone)
-    end
-    return settings.get(locales.timezone)
-end
-
 function getMessages(program_name)
     local path = paths.messages
-    local lang = settings.getDetails(locales.language)
+    local lang = LOCALES.language
     local messages = dofile(path..program_name.."/"..lang.default..".lua", _ENV)
     if lang.default ~= lang.value then
         if fs.exists(path..program_name.."/"..lang.value..".lua") then
@@ -102,5 +89,3 @@ function getMessages(program_name)
     end
     return messages
 end
-
-loadLocales()
