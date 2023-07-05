@@ -1,4 +1,4 @@
-return {
+{
     first_time="$name is running for the first time, installing...",
     usage= "usage:\t cube <operation> [...]\n" ..
         "operations:\n" ..

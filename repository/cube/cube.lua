@@ -58,7 +58,10 @@ local function getInfo(name)
     if not fs.exists(system.paths.info..name..".lua") then
         return nil
     end
-    return require(system.paths.info..name)
+    local file = fs.open(system.paths.info..name..".lua", "r")
+    local info = textutils.unserialise(fs.readAll())
+    file.close()
+    return info
 end
 
 local function installLocales(name)
