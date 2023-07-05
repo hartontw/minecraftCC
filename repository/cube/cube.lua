@@ -44,7 +44,7 @@ local function downloadCode(name)
         print(data.code, data.reason)
         return false
     end
-    return data
+    return true, data
 end
 
 local function downloadInfo(name)
