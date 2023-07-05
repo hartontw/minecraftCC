@@ -12,15 +12,13 @@ end
 local function download(path)
     local repository = "https://raw.githubusercontent.com/"..username.."/"..reponame.."/master/repository/"
     
-    local code = 404
-    local reason = "Unknown"
-    local response = nil
+    local response, code, reason
 
     response, reason = http.get(repository..path)
     if not response then
         return false, {
-            code = code,
-            reason = reason
+            code = 404,
+            reason = reason or "Unknown"
         }
     end
 
@@ -29,7 +27,7 @@ local function download(path)
         response.close();
         return false, {
             code = code,
-            reason = reason
+            reason = reason or "Unknown"
         }
     end
 
@@ -42,19 +40,18 @@ local function downloadCode(name)
     local res, data = download(name.."/"..name..".lua")
     if not res then
         print(data.code, data.reason)
-        return false
+        return nil
     end
-    return true, data
+    return data
 end
 
 local function downloadInfo(name)
     local res, data = download(name.."/info.lua")
     if not res then
         print(data.code, data.reason)
-        return false
+        return nil
     end
-    writeFile(system.paths.temp..name, data)
-    return true, require(system.paths.temp..name)
+    return textutils.unserialise(data)
 end
 
 local function getInfo(name)
@@ -96,9 +93,8 @@ end
 
 local function installDependencies(dependencies)
     if not dependencies or #dependencies == 0 then
-        return
+        return true
     end
-    local res, remoteInfo, code
     print(msg.installing_dependencies)
     for name, version in pairs(dependencies) do
         local currentInfo = getInfo(name)
@@ -106,46 +102,44 @@ local function installDependencies(dependencies)
             print(msg.already_satisfied:gsub("$name", name):gsub("$version", currentInfo.version), "")
         else
             print(msg.fetching_info:gsub("$name", name), "")
-            res, remoteInfo = downloadInfo(name)
-            if not res then return false end
+            local remoteInfo = downloadInfo(name)
+            if not remoteInfo then return false end
             print(msg.installing:gsub("$name", name), "")
-            installDependencies(remoteInfo.dependencies)
+            if not installDependencies(remoteInfo.dependencies) then
+                return false
+            end
             if remoteInfo.locales and not installLocales(name) then
                 return false
             end
-            res, code = downloadCode(name)
-            if not res then return false end
+            local code = downloadCode(name)
+            if not code then return false end
             writeFile(system.paths[remoteInfo.category]..name, code)
-            if fs.exists(system.paths.info..name..".lua") then
-                fs.delete(system.paths.info..name..".lua")
-            end
-            fs.move(system.paths.temp..name..".lua", system.paths.info..name..".lua")
+            writeFile(system.paths.info..name, textutils.serialise(remoteInfo))
         end
     end
+    return true
 end
 
 local function install(name)
-    local res, remoteInfo, code
     print(msg.fetching_info:gsub("$name", name), "")
     local currentInfo = getInfo(name)
-    res, remoteInfo = downloadInfo(name)
-    if not res then return false end
+    local remoteInfo = downloadInfo(name)
+    if not remoteInfo then return false end
     if currentInfo and not mayorVersion(currentInfo.version, remoteInfo.version) then
         print(msg.already_newest:gsub("$name", name):gsub("$version", currentInfo.version), "")
         return false
     end
     print(msg.installing:gsub("$name", name), "")
-    installDependencies(remoteInfo.dependencies)
+    if not installDependencies(remoteInfo.dependencies) then
+        return false
+    end
     if remoteInfo.locales and not installLocales(name) then
         return false
     end
-    res, code = downloadCode(name)
-    if not res then return false end
+    local code = downloadCode(name)
+    if code then return false end
     writeFile(system.paths[remoteInfo.category]..name, code)
-    if fs.exists(system.paths.info..name..".lua") then
-        fs.delete(system.paths.info..name..".lua")
-    end
-    fs.move(system.paths.temp..name..".lua", system.paths.info..name..".lua")
+    writeFile(system.paths.info..name, textutils.serialise(remoteInfo))
     return true
 end
 
@@ -202,9 +196,11 @@ local function removeOrphan(name)
             return
         end
     end
-    fs.delete(system.paths.messages..name)
-    fs.delete(system.paths[info.category]..name..".lua")
     fs.delete(system.paths.info..name..".lua")
+    fs.delete(system.paths[info.category]..name..".lua")
+    if fs.exists(system.paths.messages..name) then
+        fs.delete(system.paths.messages..name)
+    end
     for k in pairs(info.dependencies) do
         removeOrphan(k)
     end
@@ -216,9 +212,11 @@ local function remove(name)
         print(msg.not_installed:gsub("$name", name), "")
         return false
     end
-    fs.delete(system.paths.messages..name)
-    fs.delete(system.paths[info.category]..name..".lua")
     fs.delete(system.paths.info..name..".lua")
+    fs.delete(system.paths[info.category]..name..".lua")
+    if fs.exists(system.paths.messages..name) then
+        fs.delete(system.paths.messages..name)
+    end
     for k in pairs(info.dependencies) do
         removeOrphan(k)
     end
