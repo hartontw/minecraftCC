@@ -38,7 +38,7 @@ end
 function loadLocales()
     defaultLocaleSettings()
     if fs.exists(paths.config.."locales.lua") then
-        local config = require(paths.config.."locales")
+        local config = dofile(paths.config.."locales"..".lua", _ENV)
         settings.set(locales.language, config.language)
         settings.set(locales.timezone, config.timezone)
     end
@@ -58,7 +58,7 @@ function load(api)
 end
 
 function import(module)
-    return require(paths.modules..module)
+    return dofile(paths.modules..module..".lua", _ENV)
 end
 
 function run(program, args)
@@ -91,10 +91,10 @@ end
 function getMessages(program_name)
     local path = paths.messages
     local lang = settings.getDetails(locales.language)
-    local messages = require(path..program_name.."/"..lang.default)
+    local messages = dofile(path..program_name.."/"..lang.defaul..".lua", _ENV)
     if lang.default ~= lang.value then
         if fs.exists(path..program_name.."/"..lang.value..".lua") then
-            local translated = require(path..program_name.."/"..lang.value)
+            local translated = dofile(path..program_name.."/"..lang.value..".lua", _ENV)
             for k, v in pairs(translated) do
                 messages[k] = v
             end

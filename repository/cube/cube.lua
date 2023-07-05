@@ -53,7 +53,7 @@ local function downloadInfo(name)
         print(data.code, data.reason)
         return false
     end
-    writeFile(system.pahts.temp..name, data)
+    writeFile(system.paths.temp..name, data)
     return true, require(system.paths.temp..name)
 end
 
