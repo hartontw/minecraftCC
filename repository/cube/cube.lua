@@ -240,6 +240,14 @@ local function clean()
     end
 end
 
+local function showInstalled()
+    local files = fs.list(system.paths.info)
+    for _, file in ipairs(files) do
+        local info = getInfo(file, true)
+        print(file:sub(1, string.len(file)-4).."("..info.version..")")
+    end
+end
+
 local function help()
     print(msg.usage)
 end
@@ -266,6 +274,7 @@ rargs.add({name="help", alias="h", type="flag", description=msg.help})
 rargs.add({name="version", alias="v", type="flag", description=msg.version})
 rargs.add({name="update", alias="u", type="flag", description=msg.update})
 rargs.add({name="clean", alias="c", type="flag", description=msg.clean})
+rargs.add({name="packages", alias="p", type="flag", description=msg.packages})
 rargs.add({name="search", alias="s", type="strings", description=msg.search})
 rargs.add({name="install", alias="i", type="strings", description=msg.install})
 rargs.add({name="remove", alias="r", type="strings", description=msg.remove})
@@ -285,6 +294,9 @@ local function main(args)
     end
     if args["clean"] then
         clean()
+    end
+    if args["packages"] then
+        showInstalled()
     end
     if args["search"] then
         for _, package in ipairs(args["search"].value) do

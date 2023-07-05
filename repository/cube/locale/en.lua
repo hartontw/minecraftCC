@@ -16,6 +16,7 @@
     remove= "Remove packages and its orphan dependencies",
     update= "Updates this program",
     clean= "Remove all orphan dependencies",
+    packages = "Show all installed packages",
     download_error= "Download error",
     fetching_info="Fetching info for $name",
     already_newest="$name is already the newest version ($version)",
