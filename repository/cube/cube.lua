@@ -321,6 +321,6 @@ end
 
 local tArgs = { ... }
 local success, err = pcall(function() main(tArgs) end)
-if not success then
-    print(err)
+if not success then    
+    print(err:match("^[^:]+:%d+:%s*(.+)$") or err)
 end
