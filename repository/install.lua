@@ -1,7 +1,7 @@
 local REPO = "https://raw.githubusercontent.com/hartontw/minecraftCC/master/repository/"
 
 print("Loading system...")
-shell.run("wget", "run", REPO.."system/system.lua")
+shell.run("wget", REPO.."system/system.lua")
 os.loadAPI("system")
 
 print("Generating paths...")
@@ -16,4 +16,9 @@ shell.run("wget", "run", REPO.."cube/cube.lua")
 print("Installing startup script...")
 shell.run("wget", REPO.."startup.lua")
 
+print("Deleting installation files...")
+fs.delete("system.lua")
+
 print("Installation complete!")
+sleep(2)
+os.reboot()
