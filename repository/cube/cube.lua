@@ -1,5 +1,8 @@
 local username = "hartontw"
 local reponame = "minecraftCC"
+local repository = "https://raw.githubusercontent.com/"..username.."/"..reponame.."/master/repository/"
+local repoTree = "https://api.github.com/repos/"..username.."/"..reponame.."/git/trees/master"
+
 local program_name = "cube"
 local msg
 
@@ -9,12 +12,10 @@ local function writeFile(path, content)
     file.close();
 end
 
-local function download(path)
-    local repository = "https://raw.githubusercontent.com/"..username.."/"..reponame.."/master/repository/"
-    
+local function download(url)
     local response, code, reason
 
-    response, reason = http.get(repository..path)
+    response, reason = http.get(url)
     if not response then
         return false, {
             code = 404,
@@ -37,7 +38,7 @@ local function download(path)
 end
 
 local function downloadCode(name)
-    local res, data = download(name.."/"..name..".lua")
+    local res, data = download(repository..name.."/"..name..".lua")
     if not res then
         print(data.code, data.reason)
         return nil
@@ -46,7 +47,7 @@ local function downloadCode(name)
 end
 
 local function downloadInfo(name)
-    local res, data = download(name.."/info.lua")
+    local res, data = download(repository..name.."/info.lua")
     if not res then
         print(data.code, data.reason)
         return nil
@@ -68,14 +69,14 @@ end
 local function installLocales(name)
     local lang = system.locales.language
     local res, data
-    res, data = download(name.."/locale/"..lang.default..".lua")
+    res, data = download(repository..name.."/locale/"..lang.default..".lua")
     if not res then
         print(data.code, data.reason)
         return false
     end
     writeFile(system.paths.messages..name.."/"..lang.default, data)
     if lang.default ~= lang.value then
-        res, data = download(name.."/locale/"..lang.value..".lua")
+        res, data = download(repository..name.."/locale/"..lang.value..".lua")
         if res then
             writeFile(system.paths.messages..name.."/"..lang.value, data)
         end
@@ -152,8 +153,7 @@ local function search(name)
     else
         print(msg.user..": "..name.."("..info.version..")")
     end
-    local repoTree = "https://api.github.com/repos/"..username.."/"..reponame.."/git/trees/master"
-    res, data = http.get(repoTree)
+    res, data = download(repoTree)
     if not res then
         print(data.code, data.reason)
         return false
@@ -161,7 +161,7 @@ local function search(name)
     local tree = textutils.unserialiseJSON(data).tree
     for _, v in ipairs(tree) do
         if v.path == "repository" then
-            res, data = http.get(v.url)
+            res, data = download(v.url)
             if not res then
                 print(data.code, data.reason)
                 return false
@@ -171,17 +171,14 @@ local function search(name)
     end
     tree = textutils.unserialiseJSON(data).tree
     for _, v in ipairs(tree) do
-        if v.path == name..".lua" then
-            res, data = downloadInfo(name)
-            if not res then
-                print(data.code, data.reason)
-                return false
-            end
+        if v.path == name then
+            data = downloadInfo(name)
+            if not data then return false end
             print(msg.remote..": "..name.."("..data.version..")")
             return true
         end
     end
-    print(msg.remote..": "..msg.not_found)
+    print(msg.remote..": "..msg.not_found:gsub("$name", name))
     return true
 end
 
