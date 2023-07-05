@@ -140,7 +140,7 @@ local function install(name)
         return false
     end
     local code = downloadCode(name)
-    if code then return false end
+    if not code then return false end
     writeFile(system.paths[remoteInfo.category]..name, code)
     writeFile(system.paths.info..name, textutils.serialise(remoteInfo))
     return true
