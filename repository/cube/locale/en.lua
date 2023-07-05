@@ -7,6 +7,7 @@
         "\tcube {-s --search}\t<package(s)>\n" ..
         "\tcube {-i --install}\t<package(s)\n" ..
         "\tcube {-r --remove}\t<package(s)\n" ..
+        "\tcube {-p --packages}\n" ..
         "\tcube {-u --update}\n" ..
         "\tcube {-c --clean}\n",
     help= "Show help",
