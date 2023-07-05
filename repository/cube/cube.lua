@@ -59,7 +59,7 @@ local function getInfo(name)
         return nil
     end
     local file = fs.open(system.paths.info..name..".lua", "r")
-    local info = textutils.unserialise(fs.readAll())
+    local info = textutils.unserialise(file.readAll())
     file.close()
     return info
 end

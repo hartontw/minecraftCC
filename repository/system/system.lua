@@ -91,7 +91,7 @@ end
 
 function getMessages(program_name)
     local path = paths.messages
-    local lang = LOCALES.language
+    local lang = locales.language
     local messages = getData(path..program_name.."/"..lang.default..".lua")
     if lang.default == lang.value then return messages end
     local translated = getData(path..program_name.."/"..lang.value..".lua")
